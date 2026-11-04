@@ -11,9 +11,11 @@
      o.size       身高（逻辑像素，中景 ≈ 56，近景可到 120+）
      o.facing     'left' | 'right' | 'front' | 'back'
      o.expression 'neutral' | 'happy' | 'shy' | 'sad' | 'cry'
-     o.action     'idle' | 'walk' | 'jump' | 'slump' | 'reach' | 'hug' | 'hold' | 'holdHigh' | 'sit' | 'sitHunch'
-                  （侧面全支持；正面/背面支持 idle、walk、jump、slump）
+     o.action     'idle' | 'walk' | 'jump' | 'slump' | 'reach' | 'hug' | 'hold' | 'holdHigh' | 'pat'
+                  | 'sit' | 'sitHunch' | 'sitHold' | 'sitSlump' | 'shrug'（只有正面）
+                  （侧面全支持；正面/背面支持 idle、walk、jump、slump，正面另有 shrug）
      o.u          动作进行到哪 0→1      o.t  全片时间（呼吸、眨眼、走路）
+     o.arms, o.armsU  手臂另用一个动作的姿势（比如 action:'walk' + arms:'holdHigh' 边走边撑伞）
      o.seat       坐高（逻辑像素，默认 0.33 × size）
      o.light      (x, y) → 0..1 这一格被照得多亮（镜头给；默认 0.55）
      o.hold       道具 CHAR.PROPS.phone / bowl / umbrella，或任何 { draw(G, hand, o) }
@@ -56,15 +58,20 @@
       const st = u < 0.15 ? base : u < 0.32 ? crouch : u < 0.72 ? air : u < 0.88 ? land : base;
       return u >= 0.32 && u < 0.72 ? over(st, { bodyY: -120 - 70 * Math.sin(Math.PI * (u - 0.32) / 0.4) }) : st;
     }
+    if (act === 'shrug' && !side) return mix(base, over(base, { as: -0.95, ae: -1.55, bs: 0.95, be: 1.55, tilt: 0.12 }), smooth(u));   // 正面摊手：两只小臂朝上
     if (act === 'slump') return mix(base, over(base, side ? { lean: 0.34, tilt: 0.5, bodyY: 22, as: 0.14, ae: 0.02, bs: 0.04, be: -0.04, plant: true, sy: 0.97 } : { tilt: 0.5, bodyY: 20, as: -0.06, bs: 0.06, ae: 0.02, be: -0.02, plant: true, sy: 0.96 }), smooth(u));
     if (!side) return base;
+    if (act === 'pat') return mix(base, over(base, { as: -0.42, ae: -2.05, tilt: -0.06 }), smooth(u));     // 手按在胸口
     if (act === 'reach') return mix(base, over(base, { lean: 0.2, tilt: -0.12, as: -1.5, ae: -0.1, bs: -0.25, be: -0.3, plantA: -95, plantB: 45 }), smooth(u));
     if (act === 'hug') return mix(base, over(base, { lean: 0.12, tilt: 0.16, as: -1.3, ae: -1.2, bs: -1.18, be: -1.3 }), smooth(u));
     if (act === 'hold') return mix(base, over(base, { as: -0.38, ae: -1.55, bs: -0.28, be: -1.5, tilt: 0.18 }), smooth(u));
     if (act === 'holdHigh') return mix(base, over(base, { as: -0.75, ae: -1.85, bs: 0.0, be: -0.25, tilt: -0.05 }), smooth(u));
-    if (act === 'sit' || act === 'sitHunch') {
+    if (act === 'sit' || act === 'sitHunch' || act === 'sitHold' || act === 'sitSlump') {
       const sit = over(base, { bodyY: -(seat + 18) - HIP_Y, plantA: -150, plantB: -128, as: -0.45, ae: -0.55, bs: -0.4, be: -0.6, lean: 0.06, tilt: 0.1 });
-      return act === 'sit' ? sit : mix(sit, over(sit, { lean: 0.62, tilt: 0.42, as: -0.72, ae: -1.12, bs: -0.62, be: -1.22 }), smooth(u));
+      if (act === 'sit') return sit;
+      if (act === 'sitHold') return mix(sit, over(sit, { as: -0.38, ae: -1.55, bs: -0.28, be: -1.5, tilt: 0.12 }), smooth(u));
+      if (act === 'sitSlump') return mix(sit, over(sit, { lean: 0.95, tilt: 0.75, as: -1.25, ae: -0.55, bs: -1.15, be: -0.6 }), smooth(u));   // 趴在桌上，额头抵着胳膊
+      return mix(sit, over(sit, { lean: 0.62, tilt: 0.42, as: -0.72, ae: -1.12, bs: -0.62, be: -1.22 }), smooth(u));
     }
     return base;
   }
@@ -75,7 +82,9 @@
   }
   const viewOf = (o) => (o.facing === 'front' ? 'front' : o.facing === 'back' ? 'back' : 'side');
   function solve(o) {
-    const S = SPEC[o.who], view = viewOf(o), side = view === 'side', P = poseFor(o, view);
+    const S = SPEC[o.who], view = viewOf(o), side = view === 'side';
+    let P = poseFor(o, view);
+    if (o.arms) { const A = poseFor(Object.assign({}, o, { action: o.arms, u: o.armsU ?? 1 }), view); P = Object.assign({}, P, { as: A.as, ae: A.ae, bs: A.bs, be: A.be }); }   // 腿照 action，手照 arms（边走边撑伞）
     const breath = 1 + 0.015 * Math.sin(q12(o.t) * TAU / 3.6 + (o.who === 'her' ? 1 : 0));
     const hip = [0, HIP_Y + P.bodyY], up = [-Math.sin(P.lean), -Math.cos(P.lean)], perp = [Math.cos(P.lean), -Math.sin(P.lean)];
     const shC = add(hip, up, TORSO * breath), neck = add(shC, up, NECK);

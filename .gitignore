@@ -240,3 +240,7 @@ projects/*/mv/renders/
 projects/*/mv/.hyperframes/
 # 项目内的 lib/ 是画法库，不是 Python 构建产物
 !projects/*/lib/
+# 草图、接触表里有歌词（对话框），只留本地
+projects/*/sketches/
+projects/*/storyboard.png
+projects/*/review/
