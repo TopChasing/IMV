@@ -97,6 +97,7 @@
     const S = SPEC[o.who], view = viewOf(o), side = view === 'side';
     let P = poseFor(o, view);
     if (o.arms) { const A = poseFor(Object.assign({}, o, { action: o.arms, u: o.armsU ?? 1 }), view); P = Object.assign({}, P, { as: A.as, ae: A.ae, bs: A.bs, be: A.be }); }   // 腿照 action，手照 arms（边走边撑伞）
+    if (o.poseFix) P = Object.assign({}, P, o.poseFix);   // 单独覆盖某几个角度（比如只把举伞那只手抬起来）
     const breath = 1 + 0.015 * Math.sin(q12(o.t) * TAU / 3.6 + (o.who === 'her' ? 1 : 0));
     const hip = [0, HIP_Y + P.bodyY], up = [-Math.sin(P.lean), -Math.cos(P.lean)], perp = [Math.cos(P.lean), -Math.sin(P.lean)];
     const shC = add(hip, up, TORSO * breath), neck = add(shC, up, NECK);
