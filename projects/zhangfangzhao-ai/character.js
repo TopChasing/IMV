@@ -1,7 +1,7 @@
 /* character.js：《唉》的两个主角，像素风（依赖 lib/pixel.js）。
    造型按专辑封面（衣着、发色）和用户给的参考照（他的发型）：
    他 'him'：24 岁，蓬松凌乱的黑发、刘海盖到眉上；黄色短袖 T 恤、牛仔裤、紫色拖鞋。SPEC.him.sleeve = 0 即换成黄背心。
-   她 'her'：只在回忆里出现，过肩的橙红长发（发根深、发尾亮）；白色吊带背心、牛仔裤、白色帆布鞋。
+   她 'her'：只在回忆里出现，中等长度的橙红头发，自然垂下、发尾落在肩上（发根深、发尾亮）；白色吊带背心、牛仔裤、白色帆布鞋。
    整个人直接光栅化在 320×240 的逻辑画布上：每段身体一个形状，自动描 1 像素墨蓝轮廓，按光抖动上色。
    骨架算姿势，但时间按一秒 12 张取整、走路固定 4 帧、位置取整 —— 看起来是逐帧换画，不是补间。
 
@@ -107,10 +107,12 @@
       : (x, y) => G.dith(S.hair, 0.3 + L(x, y) * 0.9 - toV(y) / (R * 3), x, y);
     // 她：脑后的长发（在脸后面）
     if (who === 'her') {
-      const jag = (u) => (Math.floor((u + 3 * R) / Math.max(1.5, R * 0.3)) % 2 ? 0.16 * R : 0);
-      const back = view === 'side' ? (u, v) => u > -0.15 * R && u < 1.15 * R && v > -0.85 * R && v < 2.7 * R - Math.max(0, u - 0.7 * R) * 0.6 - jag(u)
-        : view === 'back' ? (u, v) => Math.abs(u) < 1.15 * R && v > -0.6 * R && v < 2.8 * R - Math.abs(u) * 0.25 - jag(u)
-        : (u, v) => (Math.abs(u) < 1.15 * R && v > -0.6 * R && v < 0.95 * R) || (Math.abs(u) > 0.5 * R && Math.abs(u) < 1.12 * R && v < 2.3 * R - jag(u));
+      // 中长发、自然垂下：发尾刚好落到肩上（约 1.55R），两侧顺着肩膀微微往外散，发尾只有很浅的参差
+      const jag = (u) => (Math.floor((u + 3 * R) / Math.max(2, R * 0.45)) % 2 ? 0.07 * R : 0);
+      const END = 1.55 * R;
+      const back = view === 'side' ? (u, v) => u > -0.2 * R && u < 1.08 * R + Math.max(0, v) * 0.06 && v < END + 0.1 * R - Math.max(0, u - 0.8 * R) * 0.4 - jag(u)
+        : view === 'back' ? (u, v) => Math.abs(u) < 1.1 * R - Math.max(0, v - 1.3 * R) * 0.5 && v < END + 0.15 * R - (Math.abs(u) / R) ** 2 * 0.12 * R - jag(u)
+        : (u, v) => Math.abs(u) < 1.1 * R - Math.max(0, v - 1.2 * R) * 0.5 && v < END - jag(u) && (v < 0.85 * R || Math.abs(u) > 0.55 * R);   // 两侧垂直，发尾往里收一点；下巴以下让出脖子
       const round = (u, v) => v > 0 || (u / (1.15 * R)) ** 2 + (v / (1.02 * R)) ** 2 <= 1;   // 头顶是圆的，不出方角
       G.shape([cx - 1.3 * R, cy - R, cx + 1.3 * R, cy + 3 * R], (x, y) => { const u = toU(x), v = toV(y); return round(u, v) && back(u, v); }, hairC, 0);
     }
@@ -129,7 +131,7 @@
     }
     else hair = view === 'side'
       ? (u, v) => v < -0.36 * R || u > -0.08 * R && v < 0.95 * R || (u < -0.5 * R && v < -0.18 * R)
-      : (u, v) => v < -0.3 * R - Math.abs(u) * 0.12 + (Math.abs(u) < 0.08 * R ? -0.2 * R : 0) || Math.abs(u) > 0.74 * R;
+      : (u, v) => v < -0.34 * R - Math.abs(u) * 0.1 + (Math.abs(u) < 0.06 * R ? -0.16 * R : 0) || Math.abs(u) > 0.78 * R - Math.max(0, -v) * 0.1;
     // 他的蓬发：比头大一圈、边上一簇一簇翘起来；先垫在脸后面，画完脸再把脸上沿的轮廓线盖掉
     const blob = (u, v) => { const yy = v + 0.16 * R, a = Math.atan2(yy, u), b = 1 + 0.09 * Math.sin(a * 9 + 0.7) + 0.05 * Math.sin(a * 14);
       const lim = view === 'side' ? (v < -0.05 * R || (u > 0 && v < 0.45 * R)) : v < 0.12 * R;
