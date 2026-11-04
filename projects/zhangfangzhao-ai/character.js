@@ -129,11 +129,12 @@
       : (x, y) => G.dith(S.hair, 0.3 + L(x, y) * 0.9 - toV(y) / (R * 3), x, y);
     // 她：披散长直发。头发和脸画成同一个剪影（只有外面一圈轮廓，看不到圆脑袋），头发从头顶垂直落到肩上
     let herHair = null;
+    const herFront = (v) => v > -0.05 * R ? -0.24 * R : lerp(-0.66 * R, -0.24 * R, smooth((v + 0.6 * R) / (0.55 * R)));   // 侧面头发前沿
     if (who === 'her') {
       const END = 1.85 * R, jag = (u) => (Math.floor((u + 3 * R) / Math.max(2, R * 0.4)) % 2 ? 0.05 * R : 0);
       const cap = (u, v) => v <= 0.2 * R && (u / (1.06 * R)) ** 2 + (v / (1.06 * R)) ** 2 <= 1;                     // 头顶的头发比脑袋大一圈
       herHair = view === 'side'
-        ? (u, v) => cap(u, v) || (u > -0.42 * R && u < 0.98 * R && v > -0.2 * R && v < END - jag(u))                 // 侧面：前沿、后沿都是竖直的，一整片垂到肩上，只露出前面一条脸
+        ? (u, v) => cap(u, v) || (u > -0.24 * R && u < 0.98 * R && v > -0.2 * R && v < END - jag(u))                 // 侧面：前沿、后沿都是竖直的，一整片垂到肩上，只露出前面一条脸
         : view === 'back'
           ? (u, v) => cap(u, v) || (Math.abs(u) < 1.04 * R && v > -0.2 * R && v < END + 0.05 * R - jag(u))
           : (u, v) => cap(u, v) || (Math.abs(u) > 0.7 * R && Math.abs(u) < 1.06 * R && v > -0.4 * R && v < END - jag(u));   // 正面：两片贴着脸颊竖直垂到肩上
@@ -152,7 +153,7 @@
         : (u, v) => v < -0.06 * R - zig(u) || (Math.abs(u) > 0.8 * R && v < 0.2 * R);
     }
     else hair = view === 'side'
-      ? (u, v) => v < -0.34 * R || u > -0.42 * R                                                                       // 侧面：只露出眼睛到下巴的前面一条
+      ? (u, v) => v < -0.6 * R || u > herFront(v)                                                                     // 侧面：发际线从额头往后弯到脸颊，再竖直往下
       : (u, v) => v < -0.6 * R + Math.abs(u) * 0.55 || Math.abs(u) > 0.7 * R;   // 中分，没有刘海，两边的头发贴着脸颊
     // 他的蓬发：比头大一圈、边上一簇一簇翘起来；先垫在脸后面，画完脸再把脸上沿的轮廓线盖掉
     const blob = (u, v) => { const yy = v + 0.16 * R, a = Math.atan2(yy, u), b = 1 + 0.09 * Math.sin(a * 9 + 0.7) + 0.05 * Math.sin(a * 14);
@@ -161,7 +162,11 @@
     const hb = [cx - 1.4 * R, cy - 1.4 * R, cx + 1.4 * R, cy + 1.2 * R];
     if (who === 'him') G.shape(hb, (x, y) => blob(toU(x), toV(y)), hairC, 0);
     if (herHair) G.shape([cx - 1.3 * R, cy - 1.2 * R, cx + 1.3 * R, cy + 2.0 * R], (x, y) => { const u = toU(x), v = toV(y); return face(u, v) || herHair(u, v); },
-      (x, y) => { const u = toU(x), v = toV(y); return face(u, v) && !hair(u, v) ? skinC(x, y) : hairC(x, y); }, 0);
+      (x, y) => { const u = toU(x), v = toV(y); if (face(u, v) && !hair(u, v)) return skinC(x, y);
+        const edge = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => { const u2 = toU(x + dx), v2 = toV(y + dy); return face(u2, v2) && !hair(u2, v2); });
+        if (edge && R >= 8) return S.hair[0];
+        if (R >= 10 && v > -0.3 * R && ((x + 1000) % Math.max(3, Math.round(R * 0.32))) === 0 && (y + x) % 5 !== 0) return S.hair[0];   // 竖着的发丝
+        return hairC(x, y); }, 0);
     else G.shape([cx - 1.2 * R, cy - 1.1 * R, cx + 1.2 * R, cy + 1.1 * R], (x, y) => face(toU(x), toV(y)), (x, y) => (hair(toU(x), toV(y)) ? hairC(x, y) : skinC(x, y)), 0);
     if (who === 'him') G.shape(hb, (x, y) => { const u = toU(x), v = toV(y); return blob(u, v) && (hair(u, v) || !face(u, v)); }, hairC, null);
     if (who === 'cam') G.shape([cx - 1.6 * R, cy - 1.3 * R, cx + 1.6 * R, cy], (x, y) => { const u = toU(x), v = toV(y);
@@ -256,7 +261,8 @@
     };
     const drawHead = () => { const h = W(J.head); drawHeadAt(G, h[0], h[1] - (J.P.tilt > 0.3 && J.side ? 0 : 0), S.headR * k, o, J.view, mx, light); };
     const neck = () => { const a = W(J.neck), b = W(add(J.neck, [0, 20])); G.limb(a, b, r(16), r(16), shade(RAMP.skin, 0.2, 0.8), null); };
-    if (J.view === 'side') { drawArm(J.armB, true); drawLeg(J.legB, true); drawLeg(J.legA, false); neck(); drawTorso(); drawHead(); drawArm(J.armA, false); }
+    if (J.view === 'side' && o.who === 'her') { drawArm(J.armB, true); drawLeg(J.legB, true); drawLeg(J.legA, false); neck(); drawTorso(); drawArm(J.armA, false); drawHead(); }
+    else if (J.view === 'side') { drawArm(J.armB, true); drawLeg(J.legB, true); drawLeg(J.legA, false); neck(); drawTorso(); drawHead(); drawArm(J.armA, false); }
     else if (J.view === 'front') { drawLeg(J.legA, false); drawLeg(J.legB, false); neck(); drawTorso(); drawArm(J.armA, false); drawArm(J.armB, false); drawHead(); }
     else { drawLeg(J.legA, false); drawLeg(J.legB, false); drawTorso(); drawArm(J.armA, false); drawArm(J.armB, false); drawHead(); }
     if (o.hold && o.hold.draw) o.hold.draw(G, handAt(o, o.holdHand || 'near'), o);
