@@ -114,17 +114,89 @@ function drawLamp(G, cam, st) {
   const k = Math.floor(st.tf * 4);   // 光锥里的灰尘
   if (on) for (let i = 0; i < 14; i++) { const y = 60 + ((rnd('d' + i) * 85 + st.tf * (2 + rnd('ds' + i) * 3)) % 85), x = lx + (rnd('dx' + i) - 0.5) * (20 + (y - 47) * 1.6) + Math.sin(st.tf * 0.7 + i) * 2; if (rnd('dk' + i + ':' + k) < 0.75) G.px(x, y, i % 4 ? 23 : 24); }
 }
-function bubbles(G, s, hx, hy) {   // 第 1 镜：hook 每唱一声，手机冒一个空白聊天气泡，旧的往上滚
-  const born = []; for (let b = 66.87; b <= Math.min(s, 74.4); b += 0.5106) born.push(b);
-  if (!born.length) return;
-  born.forEach((b, i) => {
-    const age = born.length - 1 - i, pop = Math.min(1, (s - b) * 6);
-    if (age > 5) return;                                                  // 最多留 6 个，旧的从顶上挤出去
-    const bx = hx + 10 + (i % 2 ? 8 : 0), by = hy - 16 - age * 10 - Math.round((1 - pop) * -3);
-    if (by < 4 || by > hy) return; const w = Math.round((18 + rnd('bw' + i) * 12) * (0.6 + 0.4 * pop));
-    G.rect(bx, by, w, 8, 0); G.rect(bx + 1, by + 1, w - 2, 6, i % 2 ? 7 : 26); G.px(bx + (i % 2 ? w - 4 : 3), by + 8, 0);
-    for (let k = 0; k < Math.floor((w - 6) / 5); k++) G.rect(bx + 3 + k * 5, by + 3, 3, 2, i % 2 ? 6 : 2);   // 只有色块，不写字
-  });
+// 第 1 镜：hook 段，他手机里弹出聊天界面（暗色模式），一拍往上翻一条聊天记录
+// 灰气泡 = 她（左），绿气泡 = 他（右）。气泡里只有色块，不写字（歌词以外不加字）
+const PH_BEATS = Array.from({ length: 15 }, (_, k) => 66.87 + k * 0.5106);   // 每个快拍
+const PH_OPEN = [66.87, 67.12], PH_CLOSE = [74.38, 74.63];
+const PHONE = { x: 116, y: 24, w: 76, h: 162 };
+const MSG = (() => {          // 0 = 最新（最下面），越往后越早
+  const out = [];
+  for (let i = 0; i < 48; i++) {
+    if (i % 7 === 4) { out.push({ who: 'time', h: 11 }); continue; }
+    const who = rnd('who' + i) < 0.64 ? 'her' : 'him', two = rnd('ln' + i) < 0.28;
+    const w1 = two ? 34 : 8 + Math.floor(rnd('w' + i) * 26), w2 = two ? 8 + Math.floor(rnd('w2' + i) * 22) : 0;
+    out.push({ who, two, w1, w2, h: (two ? 13 : 8) + 4 });
+  }
+  return out;
+})();
+function phoneUI(G, tf, hx, hy) {
+  const { x: X, y: Y, w: W, h: H } = PHONE;
+  // 开合：三档（小 → 中 → 满），像老游戏弹窗
+  const kOpen = tf < PH_OPEN[0] ? 0 : tf < PH_OPEN[1] ? Math.min(2, Math.floor((tf - PH_OPEN[0]) * 12) + 1) / 3 : 1;
+  const kClose = tf < PH_CLOSE[0] ? 1 : Math.max(0, 1 - (Math.floor((tf - PH_CLOSE[0]) * 12) + 1) / 3);
+  const k = Math.min(kOpen, kClose); if (k <= 0) return;
+  // 从他手机连过来的三个小点（想法泡泡的尾巴）
+  const tx = X + W + 2, ty = Y + H - 44;
+  [[0.25, 1], [0.55, 1], [0.85, 2]].forEach(([u, r]) => { const px = Math.round(lerp(hx, tx, u)), py = Math.round(lerp(hy - 4, ty, u)); G.rect(px - r, py - r, r * 2 + 1, r * 2 + 1, 0); G.rect(px - r + 1, py - r + 1, r * 2 - 1, r * 2 - 1, 36); });
+  if (k < 1) {   // 弹出中：只画一个空壳，从右下角长出来
+    const w = Math.round(W * k), h = Math.round(H * k), x0 = X + W - w, y0 = Y + H - h;
+    G.rect(x0, y0, w, h, 0); G.rect(x0 + 1, y0 + 1, w - 2, h - 2, 39); G.rect(x0 + 3, y0 + 3, w - 6, h - 6, 32); return;
+  }
+  // 机身：墨蓝描边、圆角、2 像素边框、顶上摄像头
+  const corner = (i, j, w, h, r) => { const dx = Math.max(0, r - i, i - (w - 1 - r)), dy = Math.max(0, r - j, j - (h - 1 - r)); return dx * dx + dy * dy > r * r; };
+  for (let j = -1; j <= H; j++) for (let i = -1; i <= W; i++) {
+    const inBody = i >= 0 && j >= 0 && i < W && j < H && !corner(i, j, W, H, 5);
+    if (inBody) G.px(X + i, Y + j, 39);
+    else if (i >= -1 && j >= -1 && i <= W && j <= H && !corner(i + 1, j + 1, W + 2, H + 2, 6)) G.px(X + i, Y + j, 0);
+  }
+  const sx = X + 3, sy = Y + 3, sw = W - 6, sh = H - 6;
+  G.rect(sx, sy, sw, sh, 32);
+  G.rect(X + W / 2 - 1, Y + 1, 2, 1, 0);
+  // 状态栏：左边时间（色块），右边信号和电池
+  G.rect(sx + 4, sy + 2, 2, 2, 36); G.rect(sx + 7, sy + 2, 2, 2, 36); G.px(sx + 10, sy + 2, 36); G.px(sx + 10, sy + 3, 36); G.rect(sx + 12, sy + 2, 2, 2, 36);
+  for (let k2 = 0; k2 < 3; k2++) G.rect(sx + sw - 20 + k2 * 2, sy + 4 - k2, 1, k2 + 1, 36);
+  G.rect(sx + sw - 12, sy + 1, 8, 4, 36); G.rect(sx + sw - 11, sy + 2, 6, 2, 32); G.rect(sx + sw - 11, sy + 2, 2, 2, 31); G.px(sx + sw - 4, sy + 2, 36);   // 电量只剩一格红
+  // 标题栏：返回、名字（色块）、更多
+  const hy0 = sy + 7; G.rect(sx, hy0, sw, 11, 33); G.line(sx, hy0 + 11, sx + sw - 1, hy0 + 11, 34);
+  [[5, 3], [4, 4], [3, 5], [4, 6], [5, 7]].forEach(([i, j]) => G.px(sx + i, hy0 + j, 36));
+  G.rect(sx + sw / 2 - 9, hy0 + 4, 18, 3, 36);
+  [0, 3, 6].forEach((d) => G.px(sx + sw - 10 + d, hy0 + 5, 36));
+  // 输入栏：语音、输入框、表情、加号
+  const iy = sy + sh - 14; G.rect(sx, iy, sw, 14, 33); G.line(sx, iy, sx + sw - 1, iy, 34);
+  G.ellipse(sx + 6, iy + 7, 3, 3, 33, 36); G.rect(sx + 12, iy + 3, sw - 32, 8, 34); G.ellipse(sx + sw - 15, iy + 7, 3, 3, 33, 36); G.ellipse(sx + sw - 6, iy + 7, 3, 3, 33, 36);
+  G.px(sx + sw - 6, iy + 6, 36); G.px(sx + sw - 6, iy + 8, 36); G.px(sx + sw - 7, iy + 7, 36); G.px(sx + sw - 5, iy + 7, 36);
+  if (Math.floor(tf * 2) % 2) G.rect(sx + 15, iy + 5, 1, 4, 37);   // 光标一闪一闪：想打字，没打
+  // 聊天区：一拍往上翻一条（内容整体往下挪），刚翻的那一帧只挪 60%
+  const top = hy0 + 12, bot = iy - 1;
+  const clip = (x, y, w, h, c) => { for (let j = 0; j < h; j++) { const yy = y + j; if (yy < top || yy >= bot) continue; for (let i = 0; i < w; i++) G.px(x + i, yy, c); } };
+  let n = 0; for (let i = 1; i < PH_BEATS.length; i++) if (tf >= PH_BEATS[i]) n = i;
+  let off = 0; for (let i = 0; i < n; i++) off += MSG[i].h;
+  if (n > 0 && tf - PH_BEATS[n] < 1 / 12) off -= Math.round(MSG[n - 1].h * 0.4);
+  const glyphs = (x, y, w, c) => { for (let g = 0; g < w; g += 4) if (rnd('g' + x + '_' + y + '_' + g) > 0.12) clip(x + g, y, Math.min(3, w - g), 2, c); };
+  const avatar = (x, y, who) => {   // 8×8 小头像，圆角
+    const her = who === 'her';
+    for (let j = 0; j < 8; j++) for (let i = 0; i < 8; i++) {
+      if ((i === 0 || i === 7) && (j === 0 || j === 7)) continue;
+      let c;
+      if (her) c = j < 2 ? (j === 0 ? 30 : 28) : (i < 2 || i > 5) ? 28 : j === 7 ? 8 : 22;
+      else c = j < 3 ? (j === 2 && i > 1 && i < 6 && (i + j) % 2 ? 22 : 1) : j === 7 ? 23 : (i === 0 || i === 7) ? 1 : 22;
+      clip(x + i, y + j, 1, 1, c);
+    }
+    clip(x + 2, y + 4, 1, 1, 0); clip(x + 5, y + 4, 1, 1, 0);
+  };
+  let yb = bot - 3 + off;
+  for (let i = 0; i < MSG.length; i++) {
+    const m = MSG[i]; const y0 = yb - m.h + 4; yb -= m.h;
+    if (y0 > bot) continue; if (y0 + m.h < top) break;
+    if (m.who === 'time') { clip(sx + sw / 2 - 7, y0 + 3, 14, 2, 35); continue; }
+    const bh = m.two ? 13 : 8, bw = m.w1 + 6, her = m.who === 'her';
+    const ax = her ? sx + 3 : sx + sw - 11, bx = her ? sx + 14 : sx + sw - 14 - bw;
+    const bg = her ? 34 : 37, tx = her ? 36 : 38;
+    avatar(ax, y0, m.who);
+    clip(bx + 1, y0, bw - 2, bh, bg); clip(bx, y0 + 1, 1, bh - 2, bg); clip(bx + bw - 1, y0 + 1, 1, bh - 2, bg);   // 圆角
+    if (her) { clip(bx - 1, y0 + 3, 1, 2, bg); clip(bx - 2, y0 + 3.5 | 0, 1, 1, bg); } else { clip(bx + bw, y0 + 3, 1, 2, bg); clip(bx + bw + 1, y0 + 3, 1, 1, bg); }   // 小尖角朝头像
+    glyphs(bx + 3, y0 + 3, m.w1, tx); if (m.two) glyphs(bx + 3, y0 + 8, m.w2, tx);
+  }
 }
 
 // ============================== 街（横版卷轴） ==============================
@@ -294,7 +366,7 @@ function drawDialog(G, s) {
 // 现在的时空：暖色往暗、冷的方向挪一级（他的黄 T 恤变成暗琥珀、木头和皮肤暗一级、墙暗一级）
 const COLD = Array.from({ length: 32 }, (_, i) => i);
 Object.assign(COLD, { 11: 10, 10: 9, 17: 16, 16: 15, 15: 14, 22: 21, 29: 7, 24: 23, 23: 25, 25: 14, 28: 30, 8: 7 });
-function cold(Gx) { for (let i = 0; i < Gx.B.length; i++) Gx.B[i] = COLD[Gx.B[i]]; }
+function cold(Gx) { for (let i = 0; i < Gx.B.length; i++) Gx.B[i] = COLD[Gx.B[i]] ?? Gx.B[i]; }
 // ============================== 镜头 ==============================
 function shotRoom1(G, s) {   // 第 1–2 镜：出租屋，现在 / 她闪现
   const tf = q(s), herOn = blinkIn(s, 76.72) && blinkOut(s, 80.85);
@@ -326,7 +398,7 @@ function shotRoom1(G, s) {   // 第 1–2 镜：出租屋，现在 / 她闪现
   }
   drawTableTop(G, cam, st); drawLamp(G, cam, st);
   if (!warm) cold(G);
-  if (tf < 74.63) { const h = CHAR.handAt(him); bubbles(G, s, h.x, h.y); if (Math.floor(tf * 3) % 2) G.line(h.x - 1, h.y - 6, h.x + 1, h.y - 6, 8); }   // 手机往上划
+  if (tf < 74.63) { const h = CHAR.handAt(him); phoneUI(G, tf, h.x, h.y); if (Math.floor(tf * 3) % 2) G.line(h.x - 1, h.y - 6, h.x + 1, h.y - 6, 8); }   // 手机往上划
 }
 function shotStreet(G, s) {   // 第 3–6 镜：夜街，一镜到底往右卷
   const S = streetState(s), tf = S.tq;

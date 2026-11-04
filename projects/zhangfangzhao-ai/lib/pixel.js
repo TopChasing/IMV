@@ -22,8 +22,11 @@
     '#eee5cf',                                                                                      // 29 米白（米饭、她的毛衣）
     '#8a3320',                                                                                      // 30 铁锈红（她的发根）
     '#c8433f',                                                                                      // 31 红（血条心、脸红）
+    // 32-39 只给第 1 镜的聊天界面用（暗色模式）：屏幕底、标题栏/输入栏、灰气泡、灰字/时间、浅灰图标、绿气泡、绿气泡里的字、机身
+    '#191919', '#232323', '#2e2e2e', '#6f6f6f', '#b5b5b5', '#3cc27c', '#17663e', '#34343c',
   ];
-  const C = { ink: 0, night: 1, white: 8, skin: 22, skinDk: 21, lamp: 23, bulb: 24, amber: 25, phone: 26, sea: 27, orange: 28, cream: 29, rust: 30, red: 31, blush: 31, slipper: 12 };
+  const C = { ink: 0, night: 1, white: 8, skin: 22, skinDk: 21, lamp: 23, bulb: 24, amber: 25, phone: 26, sea: 27, orange: 28, cream: 29, rust: 30, red: 31, blush: 31, slipper: 12,
+    chatBg: 32, chatBar: 33, chatGray: 34, chatDim: 35, chatIcon: 36, chatGreen: 37, chatGreenTx: 38, phoneBody: 39 };
   const RAMP = {
     sky: [1, 2, 3, 4], cold: [4, 5, 6, 7, 8], wall: [9, 10, 11], wood: [13, 14, 15, 16, 17], floor: [13, 14, 15, 16],
     tee: [25, 23, 24], jeans: [18, 19, 20], skin: [21, 22], hairHim: [0, 1, 2], hairHer: [30, 28, 25],
