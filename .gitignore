@@ -238,3 +238,5 @@ lyrics.js
 projects/*/frames/
 projects/*/mv/renders/
 projects/*/mv/.hyperframes/
+# 项目内的 lib/ 是画法库，不是 Python 构建产物
+!projects/*/lib/

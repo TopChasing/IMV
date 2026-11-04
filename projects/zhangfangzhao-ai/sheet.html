@@ -1,78 +1,70 @@
 <!doctype html>
-<!-- 角色设定图：第一排三视图，第二排表情，第三排他的动作，第四排她的动作和两个人。全部调用 character.js。 -->
+<!-- 角色设定图（像素风）：420×400 逻辑画布 ×6。第一排三视图，第二排表情（细节版头像），第三排他的动作，第四排她的动作和两个人。全部调用 character.js。 -->
 <html lang="zh-CN"><head><meta charset="UTF-8" />
-<script src="lib/paper.js"></script>
+<script src="lib/pixel.js"></script>
 <script src="character.js"></script>
-<style>html, body { margin: 0; width: 2560px; height: 2620px; overflow: hidden; background: #EFE6D6; } canvas { display: block; }</style>
-</head><body><canvas id="out" width="2560" height="2620"></canvas>
+<style>html, body { margin: 0; overflow: hidden; background: #000; } canvas { display: block; image-rendering: pixelated; }</style>
+</head><body><canvas id="out"></canvas>
 <script>
-const W = 2560, H = 2620, FONT = '"STKaiti","KaiTi","Microsoft YaHei",serif';
-const { canvas, g2, reset, rng, PROPS } = Object.assign({}, PAPER, CHAR);
-const out = document.getElementById('out'), ctx = out.getContext('2d');
-const layer = canvas(W, H), L = g2(layer);
+const LW = 420, LH = 446, SCALE = 6;
+const out = document.getElementById('out'); out.width = LW * SCALE; out.height = LH * SCALE;
+const G = PIX.create(LW, LH), { PROPS } = CHAR, T = 0.5;
+const light = (x, y) => 0.5 + 0.2 * Math.sin(x * 0.02);
+let GL = {};
 
-function cells(y, h, list) {   // 一排格子，平均分
-  const w = (W - 120) / list.length;
-  return list.map((c, i) => Object.assign({ x: 60 + i * w, y, w, h }, c));
-}
-const T = 0.5;   // 统一取一个时刻（不眨眼）
-const ROWS = [
-  { title: '三视图', cells: cells(150, 640, [
-    { label: '他 · 正面', f: (c) => CHAR.draw(L, { who: 'him', x: c.cx, y: c.fy, size: 520, facing: 'front', t: T }) },
-    { label: '他 · 侧面', f: (c) => CHAR.draw(L, { who: 'him', x: c.cx, y: c.fy, size: 520, facing: 'left', t: T }) },
-    { label: '他 · 背面', f: (c) => CHAR.draw(L, { who: 'him', x: c.cx, y: c.fy, size: 520, facing: 'back', t: T }) },
-    { label: '她 · 正面', f: (c) => CHAR.draw(L, { who: 'her', x: c.cx, y: c.fy, size: 480, facing: 'front', t: T }) },
-    { label: '她 · 侧面', f: (c) => CHAR.draw(L, { who: 'her', x: c.cx, y: c.fy, size: 480, facing: 'left', t: T }) },
-    { label: '她 · 背面', f: (c) => CHAR.draw(L, { who: 'her', x: c.cx, y: c.fy, size: 480, facing: 'back', t: T }) },
-  ]) },
-  { title: '表情', cells: cells(860, 330, ['neutral', 'happy', 'shy', 'sad', 'cry'].flatMap((e, i, a) => [])
-      .concat(['him', 'her'].flatMap((who) => [['neutral', '平静'], ['happy', '开心'], ['shy', '害羞'], ['sad', '难过'], ['cry', '流泪']].map(([e, n]) => ({ label: (who === 'him' ? '他 · ' : '她 · ') + n, f: (c) => CHAR.drawHead(L, { who, x: c.cx, y: c.y + 140, size: 190, facing: 'front', expression: e }) }))))) },
-  { title: '他的动作', cells: cells(1250, 640, [
-    { label: '站', f: (c) => CHAR.draw(L, { who: 'him', x: c.cx, y: c.fy, size: 380, t: T }) },
-    { label: '走', f: (c) => CHAR.draw(L, { who: 'him', x: c.cx, y: c.fy, size: 380, action: 'walk', t: 0.12 }) },
-    { label: '跳（最高点）', f: (c) => CHAR.draw(L, { who: 'him', x: c.cx, y: c.fy, size: 380, facing: 'front', action: 'jump', u: 0.55, expression: 'happy' }) },
-    { label: '坐着低头看手机', f: (c) => { const o = { who: 'him', x: c.cx + 40, y: c.fy, size: 380, action: 'sitHunch', expression: 'sad', t: T, hold: PROPS.phone }; stool(c.cx + 40, c.fy, 380); CHAR.draw(L, o); } },
-    { label: '塌下去', f: (c) => CHAR.draw(L, { who: 'him', x: c.cx, y: c.fy, size: 380, action: 'slump', expression: 'sad', t: T }) },
-    { label: '伸手（想留住）', f: (c) => CHAR.draw(L, { who: 'him', x: c.cx + 40, y: c.fy, size: 380, action: 'reach', expression: 'sad', t: T }) },
-    { label: '撑伞', f: (c) => CHAR.draw(L, { who: 'him', x: c.cx, y: c.fy, size: 340, action: 'holdHigh', t: T, hold: PROPS.umbrella }) },
-    { label: '端碗', f: (c) => CHAR.draw(L, { who: 'him', x: c.cx, y: c.fy, size: 380, action: 'hold', expression: 'happy', t: T, hold: PROPS.bowl }) },
-  ]) },
-  { title: '她的动作 · 两个人', cells: cells(1930, 640, [
-    { label: '站', f: (c) => CHAR.draw(L, { who: 'her', x: c.cx, y: c.fy, size: 350, t: T }) },
-    { label: '走', f: (c) => CHAR.draw(L, { who: 'her', x: c.cx, y: c.fy, size: 350, action: 'walk', t: 0.4 }) },
-    { label: '跳（最高点）', f: (c) => CHAR.draw(L, { who: 'her', x: c.cx, y: c.fy, size: 350, facing: 'front', action: 'jump', u: 0.55, expression: 'happy' }) },
-    { label: '回头', f: (c) => CHAR.draw(L, { who: 'her', x: c.cx, y: c.fy, size: 350, facing: 'right', expression: 'sad', t: T }) },
-    { label: '端碗', f: (c) => CHAR.draw(L, { who: 'her', x: c.cx, y: c.fy, size: 350, action: 'hold', expression: 'shy', t: T, hold: PROPS.bowl }) },
-    { label: '拥抱', f: (c) => { CHAR.draw(L, { who: 'him', x: c.cx - 62, y: c.fy, size: 380, facing: 'right', action: 'hug', expression: 'happy', t: T }); CHAR.draw(L, { who: 'her', x: c.cx + 58, y: c.fy, size: 350, facing: 'left', action: 'hug', expression: 'shy', t: T }); } },
-    { label: '撑伞护着她', f: (c) => { CHAR.draw(L, { who: 'her', x: c.cx - 50, y: c.fy, size: 320, facing: 'left', t: T, expression: 'shy' }); CHAR.draw(L, { who: 'him', x: c.cx + 60, y: c.fy, size: 350, facing: 'left', action: 'holdHigh', t: T, hold: CHAR.PROPS.umbrella }); } },
-  ]) },
-];
-function stool(x, y, size) {
-  const k = size / 600, s = PAPER.sprite('sheet:stool', [-100, 0, 100, 196], (a) => { [-82, 58].forEach((xx) => PAPER.twoTone(a, PAPER.rrect(xx, 18, 24, 178, 3), '#C68E5C', '#93633C', -7, 0)); PAPER.twoTone(a, PAPER.rrect(-70, 112, 140, 14, 3), '#C68E5C', '#93633C', 0, -4); PAPER.twoTone(a, PAPER.rrect(-100, 0, 200, 24, 4), '#D9A16B', '#C68E5C', 0, -7); }, { border: 9, thick: 4 });
-  PAPER.place(L, s, x + 30 * k, y - 196 * k * 1.0, { sx: k * 1.1, sy: k * 1.0, jit: 0 });
-}
-function paperBG() {
-  ctx.fillStyle = '#EFE6D6'; ctx.fillRect(0, 0, W, H);
-  const p = ctx.createPattern(PAPER.tex(), 'repeat'); ctx.fillStyle = p; ctx.globalAlpha = .9; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1;
-  ctx.strokeStyle = 'rgba(120,100,80,.12)'; ctx.lineWidth = 1; for (let x = 0; x < W; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); } for (let y = 0; y < H; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
-  ctx.fillStyle = '#3A2C30'; ctx.font = `700 64px ${FONT}`; ctx.textBaseline = 'top'; ctx.fillText('《唉》角色设定 · 纸艺关节纸偶', 60, 40);
-  ctx.font = `400 30px ${FONT}`; ctx.fillStyle = '#6B5A55'; ctx.fillText('他：24 岁，灰蓝卫衣、白球鞋　　她：回忆里的人，齐肩发、红发夹、米白毛衣、豆沙粉裙', 60, 112);
-}
-window.sceneReady = (async () => { try { await document.fonts.load(`700 64px ${FONT}`, '角色'); } catch (e) {} return true; })();
-window.renderAt = async () => {
-  paperBG();
-  for (const row of ROWS) {
-    ctx.fillStyle = '#8C6A50'; ctx.font = `700 34px ${FONT}`; ctx.textBaseline = 'top'; ctx.fillText(row.title, 60, row.cells[0].y - 6);
-    for (const c of row.cells) {
-      c.cx = c.x + c.w / 2; c.fy = c.y + c.h - 70;
-      ctx.strokeStyle = 'rgba(120,100,80,.35)'; ctx.setLineDash([8, 8]); ctx.strokeRect(c.x + 8, c.y + 36, c.w - 16, c.h - 40); ctx.setLineDash([]);
-      reset(L); L.clearRect(0, 0, W, H); c.f(c);
-      // 纸片往后投一块软影子（灯在左上）
-      const sh = canvas(W, H), sx = g2(sh); sx.drawImage(layer, 0, 0); sx.globalCompositeOperation = 'source-in'; sx.fillStyle = 'rgba(40,30,40,.38)'; sx.fillRect(0, 0, W, H);
-      ctx.save(); ctx.beginPath(); ctx.rect(c.x + 8, c.y + 36, c.w - 16, c.h - 40); ctx.clip(); ctx.filter = 'blur(10px)'; ctx.drawImage(sh, 14, 12); ctx.filter = 'none'; ctx.drawImage(layer, 0, 0); ctx.restore();
-      ctx.fillStyle = '#3A2C30'; ctx.font = `400 30px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillText(c.label, c.cx, c.y + c.h - 12); ctx.textAlign = 'left';
-    }
+function panel(x, y, w, h) {
+  for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
+    if ((i === 0 || i === w - 1) && (j === 0 || j === h - 1)) continue;
+    const e = Math.min(i, j, w - 1 - i, h - 1 - j);
+    G.px(x + i, y + j, e === 0 ? 0 : e === 1 ? 6 : e === 2 ? 3 : G.dith([10, 11], 0.3 + (1 - j / h) * 0.9, x + i, y + j));
   }
-  return out.toDataURL('image/png');
-};
+}
+function label(s, cx, y, c = 8) { G.text(GL, s, Math.round(cx - G.textW(GL, s) / 2), y, c, 0); }
+function row(y, h, title, list) {
+  G.text(GL, title, 10, y - 14, 23, 0);
+  const w = (LW - 16) / list.length;
+  list.forEach((c, i) => { const x = Math.round(8 + i * w), cw = Math.round(w) - 2; panel(x, y, cw, h); c.f(x + cw / 2, y + h - 5, y); label(c.label, x + cw / 2, y + h + 1); });
+}
+function stool(cx, fy, size) { const k = size / 56, top = Math.round(fy - 18 * k); G.rect(Math.round(cx - 9 * k), top, Math.round(18 * k), 2, 16); G.rect(Math.round(cx - 9 * k), top - 1, Math.round(18 * k), 1, 0); [-8, 6].forEach((d) => G.rect(Math.round(cx + d * k), top + 2, 2, Math.round(fy - top - 2), 14)); }
+
+function render() {
+  for (let y = 0; y < LH; y++) for (let x = 0; x < LW; x++) G.px(x, y, G.dith([1, 2], 0.3 + y / LH * 0.6, x, y));
+  G.text(GL, '《唉》角色设定 · 像素风', 10, 6, 8, 0);
+  const D = (o) => CHAR.draw(G, Object.assign({ t: T, light }, o));
+  row(34, 96, '三视图', [
+    { label: '他·正面', f: (cx, fy) => D({ who: 'him', x: cx, y: fy, size: 72, facing: 'front' }) },
+    { label: '他·侧面', f: (cx, fy) => D({ who: 'him', x: cx, y: fy, size: 72, facing: 'left' }) },
+    { label: '他·背面', f: (cx, fy) => D({ who: 'him', x: cx, y: fy, size: 72, facing: 'back' }) },
+    { label: '她·正面', f: (cx, fy) => D({ who: 'her', x: cx, y: fy, size: 66, facing: 'front' }) },
+    { label: '她·侧面', f: (cx, fy) => D({ who: 'her', x: cx, y: fy, size: 66, facing: 'left' }) },
+    { label: '她·背面', f: (cx, fy) => D({ who: 'her', x: cx, y: fy, size: 66, facing: 'back' }) },
+  ]);
+  row(162, 42, '表情（近景头像）', ['him', 'her'].flatMap((who) => [['neutral', '平静'], ['happy', '开心'], ['shy', '害羞'], ['sad', '难过'], ['cry', '流泪']].map(([e, n]) => ({ label: (who === 'him' ? '他' : '她') + n, f: (cx, fy, top) => CHAR.drawHead(G, { who, x: cx, y: top + 20, r: 12, expression: e, blink: false }) }))));
+  row(236, 90, '他的动作', [
+    { label: '站', f: (cx, fy) => D({ who: 'him', x: cx, y: fy, size: 56 }) },
+    { label: '走', f: (cx, fy) => D({ who: 'him', x: cx, y: fy, size: 56, action: 'walk', t: 0.0 }) },
+    { label: '跳', f: (cx, fy) => D({ who: 'him', x: cx, y: fy, size: 46, facing: 'front', action: 'jump', u: 0.52, expression: 'happy' }) },
+    { label: '看手机', f: (cx, fy) => { stool(cx + 3, fy, 56); D({ who: 'him', x: cx + 3, y: fy, size: 56, action: 'sitHunch', expression: 'sad', hold: PROPS.phone }); } },
+    { label: '塌下去', f: (cx, fy) => D({ who: 'him', x: cx, y: fy, size: 56, action: 'slump', expression: 'sad' }) },
+    { label: '伸手', f: (cx, fy) => D({ who: 'him', x: cx + 6, y: fy, size: 56, action: 'reach', expression: 'sad' }) },
+    { label: '撑伞', f: (cx, fy) => D({ who: 'him', x: cx, y: fy, size: 52, action: 'holdHigh', hold: PROPS.umbrella }) },
+    { label: '端碗', f: (cx, fy) => D({ who: 'him', x: cx + 2, y: fy, size: 56, action: 'hold', expression: 'happy', hold: PROPS.bowl }) },
+  ]);
+  row(356, 74, '她的动作 · 两个人', [
+    { label: '站', f: (cx, fy) => D({ who: 'her', x: cx, y: fy, size: 52 }) },
+    { label: '走', f: (cx, fy) => D({ who: 'her', x: cx, y: fy, size: 52, action: 'walk', t: 0.0 }) },
+    { label: '跳', f: (cx, fy) => D({ who: 'her', x: cx, y: fy, size: 38, facing: 'front', action: 'jump', u: 0.52, expression: 'happy' }) },
+    { label: '回头', f: (cx, fy) => D({ who: 'her', x: cx, y: fy, size: 52, facing: 'right', expression: 'sad' }) },
+    { label: '端碗', f: (cx, fy) => D({ who: 'her', x: cx + 2, y: fy, size: 52, action: 'hold', expression: 'shy', hold: PROPS.bowl }) },
+    { label: '拥抱', f: (cx, fy) => { D({ who: 'him', x: cx - 9, y: fy, size: 56, facing: 'right', action: 'hug', expression: 'happy' }); D({ who: 'her', x: cx + 9, y: fy, size: 52, facing: 'left', action: 'hug', expression: 'shy' }); } },
+    { label: '撑伞护她', f: (cx, fy) => { D({ who: 'her', x: cx - 8, y: fy, size: 42, facing: 'left', expression: 'shy' }); D({ who: 'him', x: cx + 10, y: fy, size: 46, facing: 'left', action: 'holdHigh', hold: PROPS.umbrella }); } },
+  ]);
+  G.flush(out, SCALE);
+}
+window.sceneReady = (async () => {
+  const fam = await PIX.loadFont('../../assets/fonts/fusion-pixel-12px-zh_hans.woff2');
+  GL = PIX.glyphs(fam, '《唉》角色设定 · 像素风三视图表情（近景头像）他她的动作两个人正面侧背平静开心害羞难过流泪站走跳看手机塌下去伸手撑伞端碗回头拥抱护');
+  render(); return true;
+})();
+window.renderAt = async () => { render(); return out.toDataURL('image/png'); };
 </script></body></html>

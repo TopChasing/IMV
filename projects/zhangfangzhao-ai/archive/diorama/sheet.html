@@ -1,0 +1,78 @@
+<!doctype html>
+<!-- 角色设定图：第一排三视图，第二排表情，第三排他的动作，第四排她的动作和两个人。全部调用 character.js。 -->
+<html lang="zh-CN"><head><meta charset="UTF-8" />
+<script src="lib/paper.js"></script>
+<script src="character.js"></script>
+<style>html, body { margin: 0; width: 2560px; height: 2620px; overflow: hidden; background: #EFE6D6; } canvas { display: block; }</style>
+</head><body><canvas id="out" width="2560" height="2620"></canvas>
+<script>
+const W = 2560, H = 2620, FONT = '"STKaiti","KaiTi","Microsoft YaHei",serif';
+const { canvas, g2, reset, rng, PROPS } = Object.assign({}, PAPER, CHAR);
+const out = document.getElementById('out'), ctx = out.getContext('2d');
+const layer = canvas(W, H), L = g2(layer);
+
+function cells(y, h, list) {   // 一排格子，平均分
+  const w = (W - 120) / list.length;
+  return list.map((c, i) => Object.assign({ x: 60 + i * w, y, w, h }, c));
+}
+const T = 0.5;   // 统一取一个时刻（不眨眼）
+const ROWS = [
+  { title: '三视图', cells: cells(150, 640, [
+    { label: '他 · 正面', f: (c) => CHAR.draw(L, { who: 'him', x: c.cx, y: c.fy, size: 520, facing: 'front', t: T }) },
+    { label: '他 · 侧面', f: (c) => CHAR.draw(L, { who: 'him', x: c.cx, y: c.fy, size: 520, facing: 'left', t: T }) },
+    { label: '他 · 背面', f: (c) => CHAR.draw(L, { who: 'him', x: c.cx, y: c.fy, size: 520, facing: 'back', t: T }) },
+    { label: '她 · 正面', f: (c) => CHAR.draw(L, { who: 'her', x: c.cx, y: c.fy, size: 480, facing: 'front', t: T }) },
+    { label: '她 · 侧面', f: (c) => CHAR.draw(L, { who: 'her', x: c.cx, y: c.fy, size: 480, facing: 'left', t: T }) },
+    { label: '她 · 背面', f: (c) => CHAR.draw(L, { who: 'her', x: c.cx, y: c.fy, size: 480, facing: 'back', t: T }) },
+  ]) },
+  { title: '表情', cells: cells(860, 330, ['neutral', 'happy', 'shy', 'sad', 'cry'].flatMap((e, i, a) => [])
+      .concat(['him', 'her'].flatMap((who) => [['neutral', '平静'], ['happy', '开心'], ['shy', '害羞'], ['sad', '难过'], ['cry', '流泪']].map(([e, n]) => ({ label: (who === 'him' ? '他 · ' : '她 · ') + n, f: (c) => CHAR.drawHead(L, { who, x: c.cx, y: c.y + 140, size: 190, facing: 'front', expression: e }) }))))) },
+  { title: '他的动作', cells: cells(1250, 640, [
+    { label: '站', f: (c) => CHAR.draw(L, { who: 'him', x: c.cx, y: c.fy, size: 380, t: T }) },
+    { label: '走', f: (c) => CHAR.draw(L, { who: 'him', x: c.cx, y: c.fy, size: 380, action: 'walk', t: 0.12 }) },
+    { label: '跳（最高点）', f: (c) => CHAR.draw(L, { who: 'him', x: c.cx, y: c.fy, size: 380, facing: 'front', action: 'jump', u: 0.55, expression: 'happy' }) },
+    { label: '坐着低头看手机', f: (c) => { const o = { who: 'him', x: c.cx + 40, y: c.fy, size: 380, action: 'sitHunch', expression: 'sad', t: T, hold: PROPS.phone }; stool(c.cx + 40, c.fy, 380); CHAR.draw(L, o); } },
+    { label: '塌下去', f: (c) => CHAR.draw(L, { who: 'him', x: c.cx, y: c.fy, size: 380, action: 'slump', expression: 'sad', t: T }) },
+    { label: '伸手（想留住）', f: (c) => CHAR.draw(L, { who: 'him', x: c.cx + 40, y: c.fy, size: 380, action: 'reach', expression: 'sad', t: T }) },
+    { label: '撑伞', f: (c) => CHAR.draw(L, { who: 'him', x: c.cx, y: c.fy, size: 340, action: 'holdHigh', t: T, hold: PROPS.umbrella }) },
+    { label: '端碗', f: (c) => CHAR.draw(L, { who: 'him', x: c.cx, y: c.fy, size: 380, action: 'hold', expression: 'happy', t: T, hold: PROPS.bowl }) },
+  ]) },
+  { title: '她的动作 · 两个人', cells: cells(1930, 640, [
+    { label: '站', f: (c) => CHAR.draw(L, { who: 'her', x: c.cx, y: c.fy, size: 350, t: T }) },
+    { label: '走', f: (c) => CHAR.draw(L, { who: 'her', x: c.cx, y: c.fy, size: 350, action: 'walk', t: 0.4 }) },
+    { label: '跳（最高点）', f: (c) => CHAR.draw(L, { who: 'her', x: c.cx, y: c.fy, size: 350, facing: 'front', action: 'jump', u: 0.55, expression: 'happy' }) },
+    { label: '回头', f: (c) => CHAR.draw(L, { who: 'her', x: c.cx, y: c.fy, size: 350, facing: 'right', expression: 'sad', t: T }) },
+    { label: '端碗', f: (c) => CHAR.draw(L, { who: 'her', x: c.cx, y: c.fy, size: 350, action: 'hold', expression: 'shy', t: T, hold: PROPS.bowl }) },
+    { label: '拥抱', f: (c) => { CHAR.draw(L, { who: 'him', x: c.cx - 62, y: c.fy, size: 380, facing: 'right', action: 'hug', expression: 'happy', t: T }); CHAR.draw(L, { who: 'her', x: c.cx + 58, y: c.fy, size: 350, facing: 'left', action: 'hug', expression: 'shy', t: T }); } },
+    { label: '撑伞护着她', f: (c) => { CHAR.draw(L, { who: 'her', x: c.cx - 50, y: c.fy, size: 320, facing: 'left', t: T, expression: 'shy' }); CHAR.draw(L, { who: 'him', x: c.cx + 60, y: c.fy, size: 350, facing: 'left', action: 'holdHigh', t: T, hold: CHAR.PROPS.umbrella }); } },
+  ]) },
+];
+function stool(x, y, size) {
+  const k = size / 600, s = PAPER.sprite('sheet:stool', [-100, 0, 100, 196], (a) => { [-82, 58].forEach((xx) => PAPER.twoTone(a, PAPER.rrect(xx, 18, 24, 178, 3), '#C68E5C', '#93633C', -7, 0)); PAPER.twoTone(a, PAPER.rrect(-70, 112, 140, 14, 3), '#C68E5C', '#93633C', 0, -4); PAPER.twoTone(a, PAPER.rrect(-100, 0, 200, 24, 4), '#D9A16B', '#C68E5C', 0, -7); }, { border: 9, thick: 4 });
+  PAPER.place(L, s, x + 30 * k, y - 196 * k * 1.0, { sx: k * 1.1, sy: k * 1.0, jit: 0 });
+}
+function paperBG() {
+  ctx.fillStyle = '#EFE6D6'; ctx.fillRect(0, 0, W, H);
+  const p = ctx.createPattern(PAPER.tex(), 'repeat'); ctx.fillStyle = p; ctx.globalAlpha = .9; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1;
+  ctx.strokeStyle = 'rgba(120,100,80,.12)'; ctx.lineWidth = 1; for (let x = 0; x < W; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); } for (let y = 0; y < H; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+  ctx.fillStyle = '#3A2C30'; ctx.font = `700 64px ${FONT}`; ctx.textBaseline = 'top'; ctx.fillText('《唉》角色设定 · 纸艺关节纸偶', 60, 40);
+  ctx.font = `400 30px ${FONT}`; ctx.fillStyle = '#6B5A55'; ctx.fillText('他：24 岁，灰蓝卫衣、白球鞋　　她：回忆里的人，齐肩发、红发夹、米白毛衣、豆沙粉裙', 60, 112);
+}
+window.sceneReady = (async () => { try { await document.fonts.load(`700 64px ${FONT}`, '角色'); } catch (e) {} return true; })();
+window.renderAt = async () => {
+  paperBG();
+  for (const row of ROWS) {
+    ctx.fillStyle = '#8C6A50'; ctx.font = `700 34px ${FONT}`; ctx.textBaseline = 'top'; ctx.fillText(row.title, 60, row.cells[0].y - 6);
+    for (const c of row.cells) {
+      c.cx = c.x + c.w / 2; c.fy = c.y + c.h - 70;
+      ctx.strokeStyle = 'rgba(120,100,80,.35)'; ctx.setLineDash([8, 8]); ctx.strokeRect(c.x + 8, c.y + 36, c.w - 16, c.h - 40); ctx.setLineDash([]);
+      reset(L); L.clearRect(0, 0, W, H); c.f(c);
+      // 纸片往后投一块软影子（灯在左上）
+      const sh = canvas(W, H), sx = g2(sh); sx.drawImage(layer, 0, 0); sx.globalCompositeOperation = 'source-in'; sx.fillStyle = 'rgba(40,30,40,.38)'; sx.fillRect(0, 0, W, H);
+      ctx.save(); ctx.beginPath(); ctx.rect(c.x + 8, c.y + 36, c.w - 16, c.h - 40); ctx.clip(); ctx.filter = 'blur(10px)'; ctx.drawImage(sh, 14, 12); ctx.filter = 'none'; ctx.drawImage(layer, 0, 0); ctx.restore();
+      ctx.fillStyle = '#3A2C30'; ctx.font = `400 30px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillText(c.label, c.cx, c.y + c.h - 12); ctx.textAlign = 'left';
+    }
+  }
+  return out.toDataURL('image/png');
+};
+</script></body></html>
