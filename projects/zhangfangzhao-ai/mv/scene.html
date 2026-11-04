@@ -71,13 +71,13 @@ function drawRoom(G, cam, st) {
   if (leafW > 4) G.px(d1 - leafW + 4, dy0 + 44, 23);                                                               // 门把手
   if (door > 0.05) for (let y = FLOOR; y < LH; y++) { const sp = (y - FLOOR) * 0.5 * door; for (let x = Math.round(d0 - sp); x < d0 + (d1 - d0 - leafW) + sp; x++) if (PIX.bt(x + cam, y) < 0.55 * door) G.px(x, y, (y - FLOOR) % 9 === 0 ? 15 : 16); }
   // 窗（外面城市 + 雨）
-  const X0 = 20 - cam, Y0 = 34, X1 = 104 - cam, Y1 = 118;
+  const WX0 = 26, WY0 = 44, WX1 = 88, WY1 = 100, X0 = WX0 - cam, Y0 = WY0, X1 = WX1 - cam, Y1 = WY1;
   for (let y = Y0; y <= Y1; y++) for (let x = X0; x <= X1; x++) G.px(x, y, G.dith(RAMP.sky, 0.3 + ((y - Y0) / (Y1 - Y0)) * 2.4, x, y));
-  [[20, 78, 14], [33, 66, 12], [44, 86, 16], [59, 58, 11], [69, 74, 13], [81, 90, 10], [90, 70, 15]].forEach(([bx, by, bw], i) => {
-    for (let y = by; y <= Y1; y++) for (let x = bx; x < Math.min(bx + bw, 105); x++) G.px(x - cam, y, 1);
-    for (let y = by + 3; y < Y1 - 2; y += 4) for (let x = bx + 2; x < Math.min(bx + bw - 1, 104); x += 3) if (rnd('w' + i + ':' + x + ':' + y) < 0.22 && !(rnd('wb' + i + x + y + ':' + Math.floor(st.tf * 0.5)) < 0.04)) G.px(x - cam, y, 25);
+  [[20, 78, 14], [33, 66, 12], [44, 86, 16], [59, 58, 11], [69, 74, 13], [81, 90, 10], [90, 70, 15]].map(([bx, by, bw]) => [Math.round(WX0 + (bx - 20) * 62 / 84), Math.round(WY0 + (by - 34) * 56 / 84), Math.max(6, Math.round(bw * 62 / 84))]).forEach(([bx, by, bw], i) => {
+    for (let y = by; y <= Y1; y++) for (let x = bx; x < Math.min(bx + bw, WX1 + 1); x++) G.px(x - cam, y, 1);
+    for (let y = by + 3; y < Y1 - 2; y += 4) for (let x = bx + 2; x < Math.min(bx + bw - 1, WX1); x += 3) if (rnd('w' + i + ':' + x + ':' + y) < 0.22 && !(rnd('wb' + i + x + y + ':' + Math.floor(st.tf * 0.5)) < 0.04)) G.px(x - cam, y, 25);
   });
-  if (st.rain > 0) for (let i = 0; i < 70 * st.rain; i++) { const x = X0 + Math.floor(rnd('rr' + i) * 85), y0 = Y0 + ((rnd('ry' + i) * 120 + st.tf * 150) % 100); for (let k = 0; k < 3; k++) if (y0 + k <= Y1) G.px(x, y0 + k, 6); }
+  if (st.rain > 0) for (let i = 0; i < 45 * st.rain; i++) { const x = X0 + Math.floor(rnd('rr' + i) * (X1 - X0 + 1)), y0 = Y0 + ((rnd('ry' + i) * 120 + st.tf * 150) % (Y1 - Y0 + 16)); for (let k = 0; k < 3; k++) if (y0 + k <= Y1) G.px(x, y0 + k, 6); }
   shapeFrame(G, X0, Y0, X1, Y1, L, cam);
   drawWallPhoto(G, cam, L);
   drawClock(G, cam, st.tf, L);
@@ -90,7 +90,7 @@ function drawRoom(G, cam, st) {
   G.poly([[218 - cam, TABLE_Y + 4], [222 - cam, TABLE_Y + 4], [223 - cam, 200], [217 - cam, 200]], (x, y) => G.dith(RAMP.wood, 0.4 + L(x, y) * 1.5, x, y), 0);
 }
 // ---- 墙上的时钟：现在是半夜 2:47；回忆里拨回当时的时间。进出回忆时指针倒转 / 正转 0.5 秒 ----
-const CLOCK = [292, 62, 9];
+const CLOCK = [290, 66, 13];
 const NOW0 = 2 * 3600 + 47 * 60 + 20;                       // 66.87 那一刻：02:47:20
 const MEM = [                                                // [开始转, 转完, 回忆里的时刻, 开始转回, 转回完]
   [76.22, 76.72, 19 * 3600 + 32 * 60, 80.85, 81.35],        // 第 2 镜：一起吃晚饭，19:32
@@ -114,9 +114,9 @@ function drawClock(G, cam, tf, L) {
   for (let k = 0; k < 12; k++) { const a = k * Math.PI / 6; G.px(cx + Math.round(Math.sin(a) * (R - 2)), cy - Math.round(Math.cos(a) * (R - 2)), k % 3 ? 6 : 1); }
   const sec = clockSec(tf), hand = (ang, len, c) => G.line(cx, cy, cx + Math.round(Math.sin(ang) * len), cy - Math.round(Math.cos(ang) * len), c);
   const hm = ((sec / 3600) % 12 + 12) % 12, mm = ((sec / 60) % 60 + 60) % 60, ss2 = Math.floor(((sec % 60) + 60) % 60);
-  const ha = hm / 12 * Math.PI * 2; hand(ha, 4, 0); G.line(cx + Math.round(Math.cos(ha)), cy + Math.round(Math.sin(ha)), cx + Math.round(Math.sin(ha) * 4 + Math.cos(ha)), cy - Math.round(Math.cos(ha) * 4 - Math.sin(ha)), 0);   // 时针：短、两像素粗
-  hand(mm / 60 * Math.PI * 2, 7, 0);                                                                       // 分针：长、细
-  hand(ss2 / 60 * Math.PI * 2, 7, 31);                                                                     // 秒针一秒跳一格
+  const ha = hm / 12 * Math.PI * 2; hand(ha, 6, 0); G.line(cx + Math.round(Math.cos(ha)), cy + Math.round(Math.sin(ha)), cx + Math.round(Math.sin(ha) * 6 + Math.cos(ha)), cy - Math.round(Math.cos(ha) * 6 - Math.sin(ha)), 0);   // 时针：短、两像素粗
+  hand(mm / 60 * Math.PI * 2, 10, 0);                                                                       // 分针：长、细
+  hand(ss2 / 60 * Math.PI * 2, 11, 31);                                                                     // 秒针一秒跳一格
   G.px(cx, cy, 0);
 }
 // ---- 墙上的拍立得：海边自拍那一张（第 8 镜卡嚓那一刻的画面，缩小 10 倍） ----
@@ -146,19 +146,19 @@ function drawWallPhoto(G, cam, L) {
   G.rect(X + 12, Y - 2, 8, 3, 29); G.px(X + 12, Y - 2, 7);                                  // 顶上一条胶带
 }
 function shapeFrame(G, X0, Y0, X1, Y1, L, cam) {
-  G.shape([X0 - 4, Y0 - 4, X1 + 4, Y1 + 4], (x, y) => x < X0 || x > X1 + 1 || y < Y0 || y > Y1 + 1 || Math.abs(x - (X0 + X1 + 1) / 2) < 1.5 || Math.abs(y - 76) < 1.5, (x, y) => G.dith([13, 14, 15], 0.6 + L(x, y) * 1.4, x, y), 0);
+  G.shape([X0 - 4, Y0 - 4, X1 + 4, Y1 + 4], (x, y) => x < X0 || x > X1 + 1 || y < Y0 || y > Y1 + 1 || Math.abs(x - (X0 + X1 + 1) / 2) < 1.5 || Math.abs(y - (Y0 + Y1) / 2) < 1.5, (x, y) => G.dith([13, 14, 15], 0.6 + L(x, y) * 1.4, x, y), 0);
   G.poly([[X0 - 8, Y1 + 4], [X1 + 8, Y1 + 4], [X1 + 6, Y1 + 9], [X0 - 6, Y1 + 9]], (x, y) => G.dith(RAMP.wood, 1.2 + L(x, y) * 2, x, y), 0);
 }
 function drawTableTop(G, cam, st) {
   const Lw = roomLight(st.I, st.sway || 0), L = (x, y) => Lw(x + cam, y);
   G.poly([[93 - cam, TABLE_Y], [229 - cam, TABLE_Y], [229 - cam, TABLE_Y + 4], [93 - cam, TABLE_Y + 4]], (x, y) => G.dith(RAMP.wood, 1.4 + L(x, y) * 2.6, x, y), 0);
   G.poly([[95 - cam, TABLE_Y + 4], [227 - cam, TABLE_Y + 4], [227 - cam, TABLE_Y + 9], [95 - cam, TABLE_Y + 9]], (x, y) => G.dith(RAMP.wood, 0.6 + L(x, y) * 1.8, x, y), 0);
-  const bowl = (cx, full) => { cx -= cam; const y = TABLE_Y - 7;
-    G.poly([[cx - 9, y], [cx + 9, y], [cx + 7, y + 5], [cx + 3, y + 7], [cx - 3, y + 7], [cx - 7, y + 5]], (x, yy) => (yy === y + 1 ? 4 : G.dith(RAMP.porcelain, 1.2 + L(x, yy) * 2 - (x - cx) / 14, x, yy)), 0);
-    if (full) G.ellipse(cx, y - 1, 7.5, 3.2, (x, yy) => G.dith([6, 29, 8], 0.8 + L(x, yy) * 1.6 - (yy - y + 3) / 4, x, yy), 0); };
-  bowl(128, true); for (let x = 117; x <= 142; x++) { G.px(x - cam, TABLE_Y - 12, 16); G.px(x + 1 - cam, TABLE_Y - 10, 15); }   // 她那碗：没动，筷子摆整齐
-  bowl(190, false); G.line(176 - cam, TABLE_Y - 1, 196 - cam, TABLE_Y - 1, 16); G.line(177 - cam, TABLE_Y - 2, 197 - cam, TABLE_Y - 3, 15);
-  if (st.phoneDown) { G.rect(206 - cam, TABLE_Y - 2, 7, 2, 0); G.px(207 - cam, TABLE_Y - 3, 2); }   // 扣在桌上的手机
+  const bowl = (cx, full) => { cx -= cam; const y = TABLE_Y - 5;
+    G.poly([[cx - 6, y], [cx + 6, y], [cx + 5, y + 3], [cx + 2, y + 5], [cx - 2, y + 5], [cx - 5, y + 3]], (x, yy) => (yy === y + 1 ? 4 : G.dith(RAMP.porcelain, 1.2 + L(x, yy) * 2 - (x - cx) / 10, x, yy)), 0);
+    if (full) G.ellipse(cx, y - 1, 5, 2.2, (x, yy) => G.dith([6, 29, 8], 0.8 + L(x, yy) * 1.6 - (yy - y + 3) / 4, x, yy), 0); };
+  bowl(128, true); for (let x = 119; x <= 138; x++) { G.px(x - cam, TABLE_Y - 8, 16); G.px(x + 1 - cam, TABLE_Y - 7, 15); }   // 她那碗：没动，筷子摆整齐
+  bowl(190, false); G.line(180 - cam, TABLE_Y - 1, 199 - cam, TABLE_Y - 1, 16); G.line(181 - cam, TABLE_Y - 2, 200 - cam, TABLE_Y - 2, 15);
+  if (st.phoneDown) { G.rect(205 - cam, TABLE_Y - 2, 9, 2, 0); G.px(207 - cam, TABLE_Y - 3, 2); }   // 扣在桌上的手机
 }
 function drawLamp(G, cam, st) {
   const lx = LAMP[0] - cam + (st.sway || 0); G.line(LAMP[0] - cam, 0, lx, 36, 0);
@@ -586,15 +586,17 @@ function shotDoor(G, s) {   // 平移到门口 → 第 10 镜（回忆：她走�
     const tmp = PIX.create(LW, LH); tmp.B.fill(255);
     const glance = tf >= 114.3 && tf < 114.95;   // 走之前回头看他一眼
     CHAR.draw(tmp, { who: 'her', x, y, size, facing: glance ? 'left' : 'back', action: u > 0 ? 'walk' : 'idle', t: tf, light, expression: 'sad' });
-    { // 链条水桶包：挎在肩上，包身落在腰侧
-      const sd = glance ? -1 : 1, bw = Math.max(9, Math.round(size * 0.21)), bh = Math.max(8, Math.round(size * 0.2));
-      const bx = Math.round(x + sd * size * 0.15 - bw / 2), by = Math.round(y - size * 0.5), shx = Math.round(x + sd * size * 0.09), shy = Math.round(y - size * 0.8);
+    { // 链条水桶包：斜挎。链条从右肩斜跨过后背到左胯，包贴在左胯外侧
+      const sd = glance ? -1 : 1, bw = Math.max(7, Math.round(size * 0.15)), bh = Math.max(7, Math.round(size * 0.14));
+      const shx = Math.round(x + sd * size * 0.11), shy = Math.round(y - size * 0.79);                 // 肩
+      const hpx = Math.round(x - sd * size * 0.16), hpy = Math.round(y - size * 0.47);                 // 对侧胯
+      const bx = hpx - (sd > 0 ? bw - 2 : 1), by = hpy;
       const gold = (xx, yy) => ((xx + yy) % 2 ? 23 : 25);
-      tmp.line(shx, shy, bx + 1, by, gold); tmp.line(shx + sd, shy, bx + bw - 2, by, gold);                                                          // 金色链条肩带
+      tmp.line(shx, shy, hpx, hpy, gold); tmp.line(shx, shy - 1, shx + sd * 2, shy + 1, gold);           // 斜跨的金色链条，搭过肩头
       tmp.shape([bx - 1, by - 1, bx + bw + 1, by + bh + 1], (xx, yy) => { const v = (yy - by) / bh; return v >= 0 && v <= 1 && Math.abs(xx - bx - bw / 2) <= bw / 2 - (v < 0.2 ? (0.2 - v) * bw * 0.6 : 0) + (v > 0.85 ? -(v - 0.85) * 6 : 0); },
         (xx, yy) => (((xx - bx) + (yy - by)) % 4 === 0 || ((xx - bx) - (yy - by) + 64) % 4 === 0 ? 1 : G.dith([0, 1, 2], 1 + light(xx, yy) * 0.8, xx, yy)), 0);   // 黑色菱格皮，上口收紧
-      tmp.rect(bx + Math.floor(bw / 2) - 1, by + 1, 2, 1, 24);                                                                                     // 金色扣
-      for (let k = 0; k < Math.round(bh * 0.5); k++) tmp.px(bx + Math.floor(bw / 2) + (k % 3 === 2 ? 1 : 0), by + 2 + k, gold(k, 0));               // 垂下来的抽绳链
+      tmp.rect(bx + Math.floor(bw / 2) - 1, by + 1, 2, 1, 24);                                          // 金色扣
+      for (let k = 0; k < Math.round(bh * 0.45); k++) tmp.px(bx + Math.floor(bw / 2) + (k % 3 === 2 ? 1 : 0), by + 2 + k, gold(k, 0));
     }
     const [d0, dy0, d1] = [DOOR[0] - cam, DOOR[1], DOOR[2] - cam], leafW = Math.round((d1 - d0) * (1 - st.door));
     for (let i = 0; i < LW * LH; i++) { if (tmp.B[i] === 255) continue; const px = i % LW, py = (i / LW) | 0; if (u > 0.6 && (px < d0 || px >= d1 - leafW || py < dy0)) continue; G.B[i] = tmp.B[i]; }
