@@ -14,6 +14,8 @@
      o.action     'idle' | 'walk' | 'jump' | 'slump' | 'reach' | 'hug' | 'hold' | 'holdHigh' | 'pat'
                   | 'sit' | 'sitHunch' | 'sitHold' | 'sitSlump' | 'shrug'（只有正面）
                   （侧面全支持；正面/背面支持 idle、walk、jump、slump，正面另有 shrug）
+     o.who        'him' | 'her' | 'cam'（海边的路人摄影师）
+     动作另有 'shoot'（端相机，侧面）、'wipe'（抬手到对方脸颊，侧面）
      o.u          动作进行到哪 0→1      o.t  全片时间（呼吸、眨眼、走路）
      o.arms, o.armsU  手臂另用一个动作的姿势（比如 action:'walk' + arms:'holdHigh' 边走边撑伞）
      o.seat       坐高（逻辑像素，默认 0.33 × size）
@@ -31,6 +33,9 @@
       top: RAMP.tee, sleeve: 0.5, bottom: RAMP.jeans, hair: RAMP.hairHim, shoe: 'slide' },
     her: { headR: 64, sw: 50, hw: 30, upper: 100, fore: 88, thigh: 140, shin: 132, armR: [19, 17, 16, 14], legR: [25, 22, 21, 18],
       top: RAMP.cami, sleeve: 0, bottom: RAMP.jeans, hair: RAMP.hairHer, shoe: RAMP.shoeHer },
+    // 路人摄影师：只在海边出现。青灰外套、棕裤、红色棒球帽
+    cam: { headR: 64, sw: 58, hw: 34, upper: 106, fore: 90, thigh: 140, shin: 132, armR: [26, 22, 21, 17], legR: [31, 27, 26, 23],
+      top: [27, 5, 6], sleeve: 0.95, bottom: [13, 14, 15], hair: [13, 14, 15], shoe: [5, 6, 7] },
   };
   const HIP_Y = -280, TORSO = 175, NECK = 24;
   const dir = (a) => [Math.sin(a), Math.cos(a)];
@@ -61,6 +66,11 @@
     if (act === 'shrug' && !side) return mix(base, over(base, { as: -0.95, ae: -1.55, bs: 0.95, be: 1.55, tilt: 0.12 }), smooth(u));   // 正面摊手：两只小臂朝上
     if (act === 'slump') return mix(base, over(base, side ? { lean: 0.34, tilt: 0.5, bodyY: 22, as: 0.14, ae: 0.02, bs: 0.04, be: -0.04, plant: true, sy: 0.97 } : { tilt: 0.5, bodyY: 20, as: -0.06, bs: 0.06, ae: 0.02, be: -0.02, plant: true, sy: 0.96 }), smooth(u));
     if (!side) return base;
+    if (act === 'shoot') {   // 端相机：u=0 相机在胸前，u=1 举到眼前
+      const hold = over(base, { as: -0.38, ae: -1.55, bs: -0.28, be: -1.5 });
+      return mix(hold, over(base, { as: -1.6, ae: -2.18, bs: -1.5, be: -2.25, lean: 0.06, tilt: 0.04 }), smooth(u));
+    }
+    if (act === 'wipe') return mix(base, over(base, { as: -1.4, ae: -1.2, lean: 0.1, tilt: 0.1 }), smooth(u));   // 手抬到对方脸颊的高度
     if (act === 'pat') return mix(base, over(base, { as: -0.42, ae: -2.05, tilt: -0.06 }), smooth(u));     // 手按在胸口
     if (act === 'reach') return mix(base, over(base, { lean: 0.2, tilt: -0.12, as: -1.5, ae: -0.1, bs: -0.25, be: -0.3, plantA: -95, plantB: 45 }), smooth(u));
     if (act === 'hug') return mix(base, over(base, { lean: 0.12, tilt: 0.16, as: -1.3, ae: -1.2, bs: -1.18, be: -1.3 }), smooth(u));
@@ -149,6 +159,9 @@
     if (who === 'him') G.shape(hb, (x, y) => blob(toU(x), toV(y)), hairC, 0);
     G.shape([cx - 1.2 * R, cy - 1.1 * R, cx + 1.2 * R, cy + 1.1 * R], (x, y) => face(toU(x), toV(y)), (x, y) => (hair(toU(x), toV(y)) ? hairC(x, y) : skinC(x, y)), 0);
     if (who === 'him') G.shape(hb, (x, y) => { const u = toU(x), v = toV(y); return blob(u, v) && (hair(u, v) || !face(u, v)); }, hairC, null);
+    if (who === 'cam') G.shape([cx - 1.6 * R, cy - 1.3 * R, cx + 1.6 * R, cy], (x, y) => { const u = toU(x), v = toV(y);
+      return (v < -0.26 * R && (u / (1.06 * R)) ** 2 + ((v + 0.05 * R) / (1.08 * R)) ** 2 <= 1) || (view === 'side' && v >= -0.44 * R && v < -0.24 * R && u < -0.3 * R && u > -1.55 * R) || (view === 'front' && v >= -0.42 * R && v < -0.24 * R && Math.abs(u) < 1.2 * R); },
+      (x, y) => G.dith([30, 31], 0.5 + L(x, y), x, y), 0);   // 红色棒球帽，帽檐朝前
     if (view === 'side') G.ellipse(cx + flip * R * 0.16, cy + R * 0.12, Math.max(0.8, R * 0.13), Math.max(1, R * 0.2), (x, y) => G.dith(RAMP.skin, 0.3 + L(x, y) * 0.6, x, y), 0);   // 侧面的耳朵
     if (view === 'back') return;
     // 五官
@@ -217,9 +230,9 @@
     const drawTorso = () => {
       const side = J.side, sw = side ? 40 : S.sw + 8, hw = side ? 34 : S.hw + 12;
       const body = [[-hw, 18], [hw, 18], [hw + 4, -40], [sw, -TORSO + 20], [sw - 16, -TORSO - 4], [-sw + 16, -TORSO - 4], [-sw, -TORSO + 20], [-hw - 4, -40]].map(rot);
-      const top = shade(S.top, o.who === 'him' ? 0.6 : 0.5, 1.5), skin = shade(RAMP.skin, 0.45, 0.9), jeans = shade(S.bottom, 0.35, 1.0);
+      const top = shade(S.top, o.who !== 'her' ? 0.6 : 0.5, 1.5), skin = shade(RAMP.skin, 0.45, 0.9), jeans = shade(S.bottom, 0.35, 1.0);
       let col;
-      if (o.who === 'him') col = (x, y) => {
+      if (o.who !== 'her') col = (x, y) => {
         const [lx, ly] = toLocal(x, y);
         if (!side && J.view === 'front' && Math.abs(lx) < 24 && ly < -TORSO + 2 + 16 * (1 - (lx / 24) ** 2)) return skin(x, y);           // 圆领
         if (S.sleeve === 0 && !side && Math.abs(lx) > sw - 18 && ly < -TORSO + 70) return skin(x, y);                                      // 背心的袖窿
@@ -233,7 +246,7 @@
         return top(x, y);
       };
       G.poly(body, col, 0);
-      if (o.who === 'him') { const h0 = rot([-hw, 12]), h1 = rot([hw, 12]); G.line(h0[0], h0[1], h1[0], h1[1], S.top[0]); }               // 下摆
+      if (o.who !== 'her') { const h0 = rot([-hw, 12]), h1 = rot([hw, 12]); G.line(h0[0], h0[1], h1[0], h1[1], S.top[0]); }               // 下摆
     };
     const drawHead = () => { const h = W(J.head); drawHeadAt(G, h[0], h[1] - (J.P.tilt > 0.3 && J.side ? 0 : 0), S.headR * k, o, J.view, mx, light); };
     const neck = () => { const a = W(J.neck), b = W(add(J.neck, [0, 20])); G.limb(a, b, r(16), r(16), shade(RAMP.skin, 0.2, 0.8), null); };
@@ -263,5 +276,10 @@
       G.shape([h.x - w - 1, top - 12 * k, h.x + w + 1, top + 2], (x, y) => { const dx = (x - h.x) / w, dy = (y - top) / (11 * k); return dx * dx + dy * dy <= 1 && y <= top + 1 - Math.abs(Math.sin((x - h.x) / w * Math.PI * 3)) * 2 * k; }, (x, y) => G.dith([2, 3, 4], 1.2 - (y - top) / (12 * k) - (x - h.x) / (w * 2), x, y), 0);
     } },
   };
-  window.CHAR = { draw, handAt, drawHead, PROPS, SPEC, REF };
+  function headAt(o) {   // 头的中心和半径（画眼泪、头顶冒字用）
+    o = Object.assign({ who: 'him', size: 56, facing: 'left', action: 'idle', u: 1, t: 0 }, o);
+    const J = solve(o), k = o.size / REF, mx = o.facing === 'right' ? -1 : 1;
+    return { x: Math.round(o.x + J.head[0] * k * mx * J.P.sx), y: Math.round(o.y + J.head[1] * k * J.P.sy), r: SPEC[o.who].headR * k, flip: mx };
+  }
+  window.CHAR = { draw, handAt, headAt, drawHead, PROPS, SPEC, REF };
 })();

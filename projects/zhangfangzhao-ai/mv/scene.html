@@ -19,7 +19,9 @@ const T0 = 66.87, DURATION = 51.83;
 const LW = 320, LH = 240, SCALE = 6;
 const { C, RAMP, clamp, lerp, smooth, rnd } = PIX;
 const out = document.getElementById('out'); out.width = LW * SCALE; out.height = LH * SCALE;
-const G = PIX.create(LW, LH), GA = PIX.create(LW, LH), GB = PIX.create(LW, LH);
+const G = PIX.create(LW, LH), GA = PIX.create(LW, LH), GB = PIX.create(LW, LH), GU = PIX.create(LW, LH);
+const WC = document.createElement('canvas'); WC.width = LW * SCALE; WC.height = LH * SCALE;
+const UC = document.createElement('canvas'); UC.width = LW; UC.height = LH; const UX = UC.getContext('2d'), UIMG = UX.createImageData(LW, LH);
 const q = (s) => Math.floor(s * 12 + 1e-6) / 12;            // 一秒 12 张
 const seg = (s, a, b) => clamp((s - a) / (b - a));
 let GL = {};
@@ -376,49 +378,49 @@ function drawSea(G, s, opt = {}) {
   const light = (x, y) => 0.5 + 0.35 * clamp(1 - Math.abs(x - 210) / 160);
   CHAR.draw(G, { who: 'him', x: 146, y: 222, size: 80, facing: 'back', t: tf, light });
   CHAR.draw(G, { who: 'her', x: 165, y: 222, size: 74, facing: 'back', t: tf, light, action: 'slump', u: 0.25 });
+  if (!opt.photo) drawPhotographer(G, tf, light);   // 照片里没有摄影师自己
   // 前景沙丘挡住腿
   for (let y = 186; y < LH; y++) for (let x = 0; x < LW; x++) if (y > 190 + 6 * Math.sin(x * 0.03) - (x > 100 && x < 220 ? 4 : 0)) G.px(x, y, G.dith([14, 15, 16], 1.2 - (y - 186) / 40, x, y));
-  if (!opt.photo && tf < CLICK + 0.95) drawTimerCam(G, tf);   // 拍完就不画相机了（被他拿走）
 }
-function drawTimerCam(G, tf) {   // 前景沙丘上一台小相机，背对我们对着两个人；定时灯越闪越快，卡嚓
-  const x = 44, y = 196;
-  G.poly([[x - 5, y + 10], [x + 1, y + 10], [x - 2, y + 4]], 1, 0); G.poly([[x + 15, y + 10], [x + 21, y + 10], [x + 18, y + 4]], 1, 0);   // 小三脚架
-  G.rect(x - 1, y - 9, 20, 13, 0); G.rect(x, y - 8, 18, 11, 2); G.rect(x + 2, y - 6, 11, 7, 1);            // 机身、背后的屏
-  G.rect(x + 3, y - 5, 9, 5, (tf >= CLICK && tf < CLICK + 0.2) ? 8 : 3);                                    // 屏：拍下那一下亮白
-  G.rect(x + 12, y - 11, 5, 2, 0);                                                                         // 快门键
-  const blink = tf < 105.65 ? false : tf < 106.70 ? (tf - 105.65) % 0.5106 < 1 / 12 : tf < 107.40 ? (tf - 106.70) % 0.2553 < 1 / 12 : tf < CLICK;
-  G.rect(x + 15, y - 6, 2, 2, blink ? 31 : 30);                                                             // 定时灯
+function drawPhotographer(G, tf, light) {   // 路人摄影师站在右边沙丘后，侧身对着两个人；快门前把相机举到眼前
+  const raise = smooth(seg(tf, CLICK - 1.0, CLICK - 0.7)) * (1 - smooth(seg(tf, CLICK + 1.1, CLICK + 1.4)));
+  const p = { who: 'cam', x: 262, y: 212, size: 74, facing: 'left', action: 'shoot', u: raise, t: tf, light, expression: 'neutral', blink: raise > 0.9 ? true : undefined };
+  CHAR.draw(G, p);
+  const h = CHAR.handAt(p), k = 74 / 56, bw = Math.round(8 * k), bh = Math.round(5 * k), x0 = h.x - Math.round(bw / 2), y0 = h.y - bh;
+  G.rect(x0 - 1, y0 - 1, bw + 2, bh + 2, 0); G.rect(x0, y0, bw, bh, 2); G.rect(x0 + 1, y0, bw - 2, 1, 4);             // 机身
+  G.rect(x0 - 3, y0 + 1, 3, bh - 2, 0); G.px(x0 - 2, y0 + 2, 6);                                                 // 镜头朝左
+  if (tf >= CLICK - 1 / 12 && tf < CLICK) G.rect(x0 + bw - 3, y0 - 2, 2, 1, 8);                                   // 按下快门
 }
 function drawPhotoFrame(G) {   // 定格时的拍立得白框：上左右 10，下 30（和墙上那张同比例）
   const [x0, y0, w, h] = PHOTO_IN;
   for (let y = 0; y < LH; y++) for (let x = 0; x < LW; x++) { if (x >= x0 && x < x0 + w && y >= y0 && y < y0 + h) continue; G.px(x, y, G.dith([7, 29, 8], 1.4 - Math.abs(y - 120) / 260, x, y)); }
   G.rect(x0 - 1, y0 - 1, w + 2, 1, 6); G.rect(x0 - 1, y0 + h, w + 2, 1, 6); G.rect(x0 - 1, y0, 1, h, 6); G.rect(x0 + w, y0, 1, h, 6);
 }
-function drawClose(G, s) {   // 近景：他的侧脸，眼泪掉下来，她的手替他擦
+function drawClose(G, s) {   // 中景：夕阳海边，他在左、她在右，她抬手替他擦掉眼角的泪
   const tf = q(s);
-  drawSeaBG(G, s, 150);
-  // 肩膀、黄 T 恤
-  G.poly([[60, 240], [70, 176], [104, 160], [170, 160], [204, 178], [214, 240]], (x, y) => G.dith(RAMP.tee, 1.0 + (x < 130 ? 0.4 : -0.2), x, y), 0);
-  G.limb([130, 150], [134, 168], 13, 14, (x, y) => G.dith(RAMP.skin, 0.7, x, y), 0);
-  const closed = tf >= 111.36;
-  const sob = hitAt(tf, SNARE, 0.17) || (tf >= 109.81 && tf < 110.5 && Math.floor(tf * 6) % 2) ? 1 : 0;   // 哭的时候一抽一抽
-  CHAR.drawHead(G, { who: 'him', x: 132, y: 112 + sob, r: 40, facing: 'right', expression: closed ? 'sad' : 'sad', blink: closed, t: tf, light: (x, y) => 0.5 + clamp((x - 100) / 120) * 0.4 });
-  // 眼泪：从眼角流到下巴，109.81 掉下
-  const ex = 132 + 20, ey = 112 + 5;
-  const tu = seg(tf, 109.5, 110.2);
-  if (tf < 111.4) { const ty = Math.round(ey + 6 + tu * 30), tx = Math.round(ex + 2 + tu * 4); G.ellipse(tx, ty, 2.2, 3, 26, 0); G.px(tx - 1, ty - 1, 8); for (let k = 0; k < tu * 26; k += 2) G.px(Math.round(ex + 2 + k / 7), Math.round(ey + 4 + k), 26); }
-  if (tf >= 110.5 && tf < 111.0) { const fy = Math.round(ey + 36 + (tf - 110.5) * 80); G.ellipse(ex + 7, fy, 1.6, 2.4, 26, 0); }
-  // 她的手：从右边伸进来，在他脸上擦两下，再收回去
-  const inU = smooth(seg(tf, 110.83, 111.36)), outU = smooth(seg(tf, 112.39, 112.9)), reach = inU * (1 - outU);
-  if (reach > 0.02) {
-    const cxk = ex + 6, cyk = ey + 11, hx = Math.round(lerp(LW + 24, cxk, reach)), hy = Math.round(lerp(LH - 30, cyk, reach)) + (tf >= 111.36 && tf < 112.39 ? (Math.floor(tf * 6) % 2 ? -2 : 1) : 0);
-    const sk = (x, y) => G.dith(RAMP.skin, 1.15 - (y - hy) / 30, x, y);
-    G.limb([hx + 12, hy + 12], [hx + 70, hy + 80], 7, 9, sk, 0);                                   // 小臂，从右下斜着进来
-    G.ellipse(hx + 4, hy + 4, 9, 7, sk, 0);                                                          // 手掌
-    for (let k = 0; k < 4; k++) G.limb([hx + 1 + k * 3, hy - 1 + k * 1], [hx - 6 + k * 3, hy - 9 + k * 2], 1.6, 1.4, sk, 0);   // 四根手指，指尖朝眼角
+  drawSeaBG(G, s, 128);
+  for (let y = 192; y < LH; y++) for (let x = 0; x < LW; x++) G.px(x, y, G.dith([15, 16, 17], 1.6 - (y - 192) / 40 + 0.3 * Math.sin(x * 0.05), x, y));
+  const light = (x, y) => 0.5 + 0.35 * clamp(1 - Math.abs(x - 210) / 160);
+  const SZ = 200, FY = 300;
+  const sob = (tf < 111.3 && (hitAt(tf, SNARE, 0.17) || (tf >= 109.81 && tf < 110.5 && Math.floor(tf * 6) % 2))) ? 1 : 0;   // 哭的时候一抽一抽
+  const reachIn = smooth(seg(tf, 110.83, 111.3)), reachOut = smooth(seg(tf, 112.39, 112.85)), reach = reachIn * (1 - reachOut);
+  const wiping = tf >= 111.3 && tf < 112.39, wiped = tf >= 111.85;
+  const him = { who: 'him', x: 122, y: FY + sob, size: SZ, facing: 'right', t: tf, light, expression: 'sad', blink: wiping ? true : undefined, action: 'idle' };
+  CHAR.draw(G, him);
+  const H = CHAR.headAt(him), ex = Math.round(H.x + 0.5 * H.r), ey = Math.round(H.y + 0.12 * H.r);
+  if (!wiped && tf >= 109.6) {   // 眼泪：从眼角冒出来，只滑到颧骨（不到半个脸）
+    const d = Math.round(Math.min(1, (tf - 109.6) / 0.9) * H.r * 0.32);
+    for (let k = 2; k < d + 2; k++) G.px(ex + 1, ey + k, 26);
+    G.ellipse(ex + 1, ey + 3 + d, 1.2, 1.7, 26, 0); G.px(ex, ey + 2 + d, 8);
   }
+  // 她：站到右边，手正好够到他的颧骨
+  const her = { who: 'her', y: FY, size: Math.round(SZ * 0.94), facing: 'left', t: tf, light, expression: wiped ? 'neutral' : 'sad', action: 'idle', arms: 'wipe', armsU: 1 };
+  const target = [ex + 2, ey + Math.round(H.r * 0.3)];
+  her.x = 0; const h0 = CHAR.handAt(her); her.x = target[0] - h0.x; her.y = FY + clamp(target[1] - h0.y, -12, 12);
+  her.armsU = reach * (wiping && Math.floor(tf * 6) % 2 ? 0.9 : 1);
+  if (reach < 0.02) { her.arms = undefined; }
+  CHAR.draw(G, her);
 }
-
 // ============================== UI：血条、对话框 ==============================
 const HEART = ['.kk.kk.', 'kxxkxxk', 'kxxxxxk', '.kxxxk.', '..kxk..', '...k...'];
 function drawHUD(G, n, flash) {
@@ -457,6 +459,24 @@ const COLD = Array.from({ length: 32 }, (_, i) => i);
 Object.assign(COLD, { 11: 10, 10: 9, 17: 16, 16: 15, 15: 14, 22: 21, 29: 7, 24: 23, 23: 25, 25: 14, 28: 30, 8: 7 });
 function cold(Gx) { for (let i = 0; i < Gx.B.length; i++) Gx.B[i] = COLD[Gx.B[i]] ?? Gx.B[i]; }
 // ============================== 镜头 ==============================
+
+// ---- 叹气：歌里的气声"唉"。只做两处：第 12 句 69.45（看手机时）、第 18 句 100.47（坐下那一下） ----
+const SIGHS = [69.45, 100.47];
+const sighAt = (tf) => SIGHS.find((t0) => tf >= t0 - 0.35 && tf < t0 + 1.5);
+function sighPose(tf) {   // 返回对 sitHunch u 的修正：吸气时直起来一点，呼气时塌下去
+  const t0 = sighAt(tf); if (t0 === undefined) return 0;
+  return tf < t0 ? -0.3 * smooth(seg(tf, t0 - 0.35, t0)) : -0.3 + 0.45 * smooth(seg(tf, t0, t0 + 0.35)) - 0.15 * smooth(seg(tf, t0 + 0.6, t0 + 1.2));
+}
+function drawSigh(G, tf, H) {   // H = 头的位置；"唉"在他脑后上方慢慢往上飘，最后点阵淡出
+  const t0 = sighAt(tf); if (t0 === undefined || tf < t0) return;
+  const u = (tf - t0) / 1.5, rise = Math.round(u * 10), alpha = 1 - smooth(seg(u, 0.7, 1));
+  const gl = GL['唉']; if (!gl) return;
+  const x0 = H.flip > 0 ? Math.round(H.x + H.r + 4) : Math.round(H.x - H.r - 28), y0 = Math.round(H.y - H.r - 18 - rise);
+  const put = (x, y, c) => { if (PIX.bt(x, y) < alpha) G.px(x, y, c); };
+  for (const [gx, gy] of gl.bits) for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1], [2, 0], [0, 2], [2, 1], [1, 2]]) for (let j = 0; j < 2; j++) for (let i = 0; i < 2; i++) put(x0 + gx * 2 + i + dx, y0 + gy * 2 + j + dy, 0);
+  for (const [gx, gy] of gl.bits) for (let j = 0; j < 2; j++) for (let i = 0; i < 2; i++) put(x0 + gx * 2 + i, y0 + gy * 2 + j, 8);
+  if (u < 0.4) for (let i = 0; i < 3; i++) { const k = u / 0.4; G.px(Math.round(H.x + H.flip * -(H.r * 0.9 + 2 + k * (6 + i * 3))), Math.round(H.y + H.r * 0.5 + i * 2 - k * 3), 7); }   // 嘴边呼出的一口气
+}
 function shotRoom1(G, s) {   // 第 1–2 镜：出租屋，现在 / 她闪现
   const tf = q(s), herOn = blinkIn(s, 76.72) && blinkOut(s, 80.85);
   const warm = s >= 76.72 && s < 80.85 ? 1 : 0;
@@ -468,7 +488,7 @@ function shotRoom1(G, s) {   // 第 1–2 镜：出租屋，现在 / 她闪现
   const nod = hitAt(tf, SNARE) ? 0.14 : 0;                                          // 军鼓上点一下头
   const look = smooth(seg(tf, 74.63, 75.0)), drop = smooth(seg(tf, 80.85, 82.2));   // 74.63 抬头；她消失后慢慢低回去
   const him = { who: 'him', ...HIM_SEAT, x: HIM_SEAT.x - cam, facing: 'left', t: tf, light: lightS };
-  if (tf < 74.63) Object.assign(him, { action: 'sitHunch', u: 1 - nod, expression: 'sad', hold: CHAR.PROPS.phone });
+  if (tf < 74.63) Object.assign(him, { action: 'sitHunch', u: clamp(1 - nod + sighPose(tf)), expression: 'sad', hold: CHAR.PROPS.phone });
   else if (tf < 80.85) {
     const eat = smooth(seg(tf, 78.95, 79.3)) * (1 - smooth(seg(tf, 79.6, 79.9)));     // 探身过去吃她递来的那口饭
     const laugh = tf >= 79.9 && (hitAt(tf, SNARE) || Math.floor(tf * 4) % 2) ? 1 : 0;
@@ -487,6 +507,7 @@ function shotRoom1(G, s) {   // 第 1–2 镜：出租屋，现在 / 她闪现
   }
   drawTableTop(G, cam, st); drawLamp(G, cam, st);
   if (!warm) cold(G);
+  drawSigh(G, tf, CHAR.headAt(him));
   if (tf < 74.63) { const h = CHAR.handAt(him); phoneUI(G, tf, h.x, h.y); if (Math.floor(tf * 3) % 2) G.line(h.x - 1, h.y - 6, h.x + 1, h.y - 6, 8); }   // 手机往上划
 }
 function shotStreet(G, s) {   // 第 3–6 镜：夜街，一镜到底往右卷
@@ -524,7 +545,7 @@ function shotRoom7(G, s) {   // 第 7 镜：回到出租屋，湿着进门坐下
   if (tf < 100.45) CHAR.draw(G, { who: 'him', x: Math.round(lerp(346, HIM_SEAT.x, walkU)), y: 204, size: 90, facing: 'left', action: 'walk', t: tf, light, expression: 'sad' });
   else {
     const o = { who: 'him', ...HIM_SEAT, facing: 'left', t: tf, light, expression: 'sad' };
-    if (tf < 101.54) Object.assign(o, { action: 'sitHunch', u: 0.6, hold: CHAR.PROPS.phone });
+    if (tf < 101.54) Object.assign(o, { action: 'sitHunch', u: clamp(0.6 + sighPose(tf) * 1.2), hold: CHAR.PROPS.phone });
     else if (tf < 103.61) Object.assign(o, { action: 'sitSlump', u: smooth(seg(tf, 101.8, 102.4)) });
     else Object.assign(o, { action: 'sitHunch', u: 0.35 });   // 抬眼看明信片
     CHAR.draw(G, o);
@@ -533,6 +554,7 @@ function shotRoom7(G, s) {   // 第 7 镜：回到出租屋，湿着进门坐下
   }
   drawTableTop(G, cam, Object.assign(st, { phoneDown: tf >= 101.54 })); drawLamp(G, cam, st);
   cold(G);
+  if (tf >= 100.45) drawSigh(G, tf, CHAR.headAt({ who: 'him', ...HIM_SEAT, facing: 'left', action: 'sitHunch', u: 0.6, t: tf }));
 }
 function zoomCopy(dst, src, cx, cy, z) { for (let y = 0; y < LH; y++) for (let x = 0; x < LW; x++) dst.px(x, y, src.get(Math.floor(cx + (x - LW / 2) / z), Math.floor(cy + (y - LH / 2) / z))); }
 function shotDoor(G, s) {   // 平移到门口 → 第 10 镜（回忆：她走出门，他伸手没够到）→ 平移回桌边
@@ -602,9 +624,37 @@ function frame(t) {
   else if (inS(s, 'zoomOut')) { shotDoor(GA, 113.10); const z = [7, 4, 2][Math.min(2, Math.floor((q(s) - 113.10) * 9))]; zoomCopy(G, GA, 160, 65, z); }
   else if (inS(s, 'door')) shotDoor(G, s);
   else shotLast(G, s);
-  drawHUD(G, heartsAt(s), heartFlash(q(s)));
-  drawDialog(G, s);
-  G.flush(out, SCALE);
+  GU.B.fill(255); drawHUD(GU, heartsAt(s), heartFlash(q(s))); drawDialog(GU, s);
+  present(s);
+}
+function memAt(tf) {   // 这一帧有多"回忆"：0 = 现在，1 = 回忆；转场时渐变
+  const r = (a, b) => smooth(seg(tf, a, b));
+  if (tf >= 76.72 && tf < 81.1) return r(76.72, 76.9) * (1 - r(80.85, 81.1));
+  if (tf >= 82.42 && tf < 99.47) return r(82.42, 82.92) * (1 - r(98.97, 99.47));
+  if (tf >= 104.12 && tf < 113.43) return r(104.12, 104.63) * (1 - r(113.10, 113.43));
+  if (tf >= 113.94 && tf < 116.4) return 1 - r(116.01, 116.4);
+  return 0;
+}
+function present(s) {
+  const tf = q(s), k = memAt(tf), o = out.getContext('2d'), W = out.width, H = out.height, f = Math.round(tf * 12);
+  G.flush(WC, SCALE);
+  o.save(); o.setTransform(1, 0, 0, 1, 0, 0); o.filter = 'none'; o.globalAlpha = 1;
+  if (k > 0.01) {
+    const jx = (rnd('jx' + f) - 0.5) * 9 * k, jy = (rnd('jy' + f) - 0.5) * 7 * k, sc = 1 + 0.03 * k, fl = (rnd('fl' + f) - 0.5) * 0.12 * k;
+    o.fillStyle = '#000'; o.fillRect(0, 0, W, H);
+    o.filter = `grayscale(${0.42 * k}) sepia(${0.32 * k}) contrast(${1 - 0.12 * k}) brightness(${1 - 0.03 * k + fl}) blur(${2.2 * k}px)`;
+    o.translate(W / 2 + jx, H / 2 + jy); o.scale(sc, sc); o.drawImage(WC, -W / 2, -H / 2);
+    o.setTransform(1, 0, 0, 1, 0, 0); o.filter = 'none';
+    const g = o.createRadialGradient(W / 2, H / 2, H * 0.3, W / 2, H / 2, H * 0.9); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, `rgba(24,16,8,${0.6 * k})`);
+    o.fillStyle = g; o.fillRect(0, 0, W, H);   // 暗角
+    for (let i = 0; i < 240; i++) { const d = rnd('gd' + f + '_' + i), z = 2 + Math.floor(rnd('gz' + f + '_' + i) * 5);
+      o.fillStyle = d < 0.55 ? `rgba(10,8,6,${0.3 * k})` : `rgba(255,246,225,${0.22 * k})`; o.fillRect(rnd('gx' + f + '_' + i) * W, rnd('gy' + f + '_' + i) * H, z, z); }   // 颗粒、灰尘
+    if (rnd('sc' + f) < 0.45) { o.fillStyle = `rgba(235,225,200,${0.28 * k})`; o.fillRect(Math.round(rnd('sx' + f) * W), 0, 3, H); }   // 划痕
+    if (rnd('hr' + f) < 0.12) { o.fillStyle = `rgba(20,14,8,${0.35 * k})`; o.fillRect(Math.round(rnd('hx' + f) * W), 0, 2, H); }
+  } else o.drawImage(WC, 0, 0);
+  o.restore();
+  const d = UIMG.data; for (let i = 0; i < LW * LH; i++) { const c = GU.B[i]; if (c === 255) { d[i * 4 + 3] = 0; continue; } const rgb = PIX.RGB[c]; d[i * 4] = rgb[0]; d[i * 4 + 1] = rgb[1]; d[i * 4 + 2] = rgb[2]; d[i * 4 + 3] = 255; }
+  UX.putImageData(UIMG, 0, 0); o.imageSmoothingEnabled = false; o.drawImage(UC, 0, 0, W, H);   // 血条、歌词框：一直清楚
 }
 window.sceneReady = (async () => {
   const fam = await PIX.loadFont('../../../assets/fonts/fusion-pixel-12px-zh_hans.woff2');
