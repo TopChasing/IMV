@@ -116,19 +116,26 @@ function drawLamp(G, cam, st) {
 }
 // 第 1 镜：hook 段，他手机里弹出聊天界面（暗色模式），一拍往上翻一条聊天记录
 // 灰气泡 = 她（左），绿气泡 = 他（右）。气泡里只有色块，不写字（歌词以外不加字）
-const PH_BEATS = Array.from({ length: 15 }, (_, k) => 66.87 + k * 0.5106);   // 每个快拍
 const PH_OPEN = [66.87, 67.12], PH_CLOSE = [74.38, 74.63];
 const PHONE = { x: 116, y: 24, w: 76, h: 162 };
-const MSG = (() => {          // 0 = 最新（最下面），越往后越早
-  const out = [];
-  for (let i = 0; i < 48; i++) {
-    if (i % 7 === 4) { out.push({ who: 'time', h: 11 }); continue; }
-    const who = rnd('who' + i) < 0.64 ? 'her' : 'him', two = rnd('ln' + i) < 0.28;
-    const w1 = two ? 34 : 8 + Math.floor(rnd('w' + i) * 26), w2 = two ? 8 + Math.floor(rnd('w2' + i) * 22) : 0;
-    out.push({ who, two, w1, w2, h: (two ? 13 : 8) + 4 });
-  }
-  return out;
+const PB = (k) => 66.87 + k * 0.5106;   // 第 k 个快拍
+const CHAT = (() => {
+  const L = [];
+  const add = (who, at, w1, w2 = 0, extra = {}) => L.push(Object.assign({ who, at, w1, w2, two: w2 > 0, h: (w2 > 0 ? 13 : 8) + 4 }, extra));
+  L.push({ who: 'time', at: -1, h: 11 });
+  add('her', -1, 14); add('him', -1, 24); add('her', -1, 9);                         // 打开前：还算平常的几句
+  L.push({ who: 'time', at: -1, h: 11 });
+  add('him', PB(1), 16);                                                              // 他发一句
+  // 她连着发：一拍一条，后面越发越快（半拍一条），长短不一
+  [2, 3, 4, 5, 6, 7, 7.5, 8, 8.5, 9, 9.5].forEach((k, i) => {
+    const two = rnd('t2' + i) < 0.4, w1 = two ? 34 : 8 + Math.floor(rnd('tw' + i) * 26);
+    add('her', PB(k), w1, two ? 6 + Math.floor(rnd('tw2' + i) * 24) : 0);
+  });
+  add('him', PB(11), 22, 0, { fail: PB(12) });                                        // 他再发 → 红色感叹号
+  L.push({ who: 'sys', at: PB(12.5), h: 10 });                                         // 一行灰色系统提示（只有色块）
+  return L;
 })();
+const TYPE = [PB(9.9), PB(11)];                                                     // 他在输入框里打字的时间
 function phoneUI(G, tf, hx, hy) {
   const { x: X, y: Y, w: W, h: H } = PHONE;
   // 开合：三档（小 → 中 → 满），像老游戏弹窗
@@ -165,13 +172,15 @@ function phoneUI(G, tf, hx, hy) {
   const iy = sy + sh - 14; G.rect(sx, iy, sw, 14, 33); G.line(sx, iy, sx + sw - 1, iy, 34);
   G.ellipse(sx + 6, iy + 7, 3, 3, 33, 36); G.rect(sx + 12, iy + 3, sw - 32, 8, 34); G.ellipse(sx + sw - 15, iy + 7, 3, 3, 33, 36); G.ellipse(sx + sw - 6, iy + 7, 3, 3, 33, 36);
   G.px(sx + sw - 6, iy + 6, 36); G.px(sx + sw - 6, iy + 8, 36); G.px(sx + sw - 7, iy + 7, 36); G.px(sx + sw - 5, iy + 7, 36);
-  if (Math.floor(tf * 2) % 2) G.rect(sx + 15, iy + 5, 1, 4, 37);   // 光标一闪一闪：想打字，没打
-  // 聊天区：一拍往上翻一条（内容整体往下挪），刚翻的那一帧只挪 60%
+  if (tf >= TYPE[0] && tf < TYPE[1]) {
+    const n = Math.min(6, Math.floor((tf - TYPE[0]) * 12 / 2) + 1);
+    for (let g = 0; g < n; g++) G.rect(sx + 15 + g * 4, iy + 6, 3, 2, 36);
+    if (Math.floor(tf * 4) % 2) G.rect(sx + 15 + n * 4, iy + 5, 1, 4, 37);
+    G.rect(sx + sw - 21, iy + 3, 18, 8, 37); G.rect(sx + sw - 18, iy + 6, 12, 2, 38);   // 绿色发送键盖住表情和加号
+  } else if (Math.floor(tf * 2) % 2) G.rect(sx + 15, iy + 5, 1, 4, 37);   // 光标一闪一闪
+  // 聊天区：正在聊——新消息从最下面冒出来，旧的往上挤；冒出来那一帧只露一半
   const top = hy0 + 12, bot = iy - 1;
   const clip = (x, y, w, h, c) => { for (let j = 0; j < h; j++) { const yy = y + j; if (yy < top || yy >= bot) continue; for (let i = 0; i < w; i++) G.px(x + i, yy, c); } };
-  let n = 0; for (let i = 1; i < PH_BEATS.length; i++) if (tf >= PH_BEATS[i]) n = i;
-  let off = 0; for (let i = 0; i < n; i++) off += MSG[i].h;
-  if (n > 0 && tf - PH_BEATS[n] < 1 / 12) off -= Math.round(MSG[n - 1].h * 0.4);
   const glyphs = (x, y, w, c) => { for (let g = 0; g < w; g += 4) if (rnd('g' + x + '_' + y + '_' + g) > 0.12) clip(x + g, y, Math.min(3, w - g), 2, c); };
   const avatar = (x, y, who) => {   // 8×8 小头像，圆角
     const her = who === 'her';
@@ -184,18 +193,30 @@ function phoneUI(G, tf, hx, hy) {
     }
     clip(x + 2, y + 4, 1, 1, 0); clip(x + 5, y + 4, 1, 1, 0);
   };
-  let yb = bot - 3 + off;
-  for (let i = 0; i < MSG.length; i++) {
-    const m = MSG[i]; const y0 = yb - m.h + 4; yb -= m.h;
+  const vis = CHAT.filter((m) => m.at <= tf);
+  const last = vis[vis.length - 1];
+  const fresh = last && last.at >= 0 && tf - last.at < 1 / 12;
+  let yb = bot - 3 + (fresh ? Math.round(last.h * 0.5) : 0);
+  for (let i = vis.length - 1; i >= 0; i--) {
+    const m = vis[i]; const y0 = yb - m.h + 4; yb -= m.h;
     if (y0 > bot) continue; if (y0 + m.h < top) break;
     if (m.who === 'time') { clip(sx + sw / 2 - 7, y0 + 3, 14, 2, 35); continue; }
+    if (m.who === 'sys') { clip(sx + sw / 2 - 22, y0 + 2, 44, 2, 35); clip(sx + sw / 2 - 12, y0 + 5, 24, 2, 35); continue; }
     const bh = m.two ? 13 : 8, bw = m.w1 + 6, her = m.who === 'her';
     const ax = her ? sx + 3 : sx + sw - 11, bx = her ? sx + 14 : sx + sw - 14 - bw;
     const bg = her ? 34 : 37, tx = her ? 36 : 38;
     avatar(ax, y0, m.who);
     clip(bx + 1, y0, bw - 2, bh, bg); clip(bx, y0 + 1, 1, bh - 2, bg); clip(bx + bw - 1, y0 + 1, 1, bh - 2, bg);   // 圆角
-    if (her) { clip(bx - 1, y0 + 3, 1, 2, bg); clip(bx - 2, y0 + 3.5 | 0, 1, 1, bg); } else { clip(bx + bw, y0 + 3, 1, 2, bg); clip(bx + bw + 1, y0 + 3, 1, 1, bg); }   // 小尖角朝头像
+    if (her) { clip(bx - 1, y0 + 3, 1, 2, bg); clip(bx - 2, y0 + 3, 1, 1, bg); } else { clip(bx + bw, y0 + 3, 1, 2, bg); clip(bx + bw + 1, y0 + 3, 1, 1, bg); }   // 小尖角朝头像
     glyphs(bx + 3, y0 + 3, m.w1, tx); if (m.two) glyphs(bx + 3, y0 + 8, m.w2, tx);
+    if (m.fail && tf >= m.fail) {   // 红色感叹号：消息被拒收。冒出来时闪两下，然后一直亮着
+      const blink = tf - m.fail < 0.34 && Math.floor((tf - m.fail) * 12) % 2 === 1;
+      if (!blink) {
+        const cx = bx - 6, cy = y0 + 4, big = tf - m.fail < 1 / 12 ? 1 : 0;
+        for (let j = -4 - big; j <= 4 + big; j++) for (let i = -4 - big; i <= 4 + big; i++) { const d = i * i + j * j; if (d <= (3.6 + big) ** 2) clip(cx + i, cy + j, 1, 1, 31); else if (d <= (4.6 + big) ** 2) clip(cx + i, cy + j, 1, 1, 0); }
+        clip(cx, cy - 2, 1, 3, 8); clip(cx, cy + 2, 1, 1, 8);
+      }
+    }
   }
 }
 
