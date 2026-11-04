@@ -218,3 +218,23 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# ===== IMV 项目 =====
+# 环境
+node_modules/
+.idea/
+# 歌曲素材：音频与歌词均有版权，只留本地
+songs/
+*.ncm
+*.mp3
+*.wav
+*.flac
+*.m4a
+*.mp4
+*.srt
+*.lrc
+lyrics.js
+# 逐帧渲染中间产物
+projects/*/frames/
+projects/*/mv/renders/
+projects/*/mv/.hyperframes/
