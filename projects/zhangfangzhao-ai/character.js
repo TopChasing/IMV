@@ -1,6 +1,7 @@
 /* character.js：《唉》的两个主角，像素风（依赖 lib/pixel.js）。
-   他 'him'：24 岁，灰蓝卫衣（背后搭着帽子）、深色裤子、白球鞋，短黑发。
-   她 'her'：只在回忆里出现，齐肩棕发、右边一枚红发夹，米白毛衣、豆沙粉半身裙、棕色小皮鞋。
+   造型按专辑封面（衣着、发色）和用户给的参考照（他的发型）：
+   他 'him'：24 岁，蓬松凌乱的黑发、刘海盖到眉上；黄色短袖 T 恤、牛仔裤、紫色拖鞋。SPEC.him.sleeve = 0 即换成黄背心。
+   她 'her'：只在回忆里出现，过肩的橙红长发（发根深、发尾亮）；白色吊带背心、牛仔裤、白色帆布鞋。
    整个人直接光栅化在 320×240 的逻辑画布上：每段身体一个形状，自动描 1 像素墨蓝轮廓，按光抖动上色。
    骨架算姿势，但时间按一秒 12 张取整、走路固定 4 帧、位置取整 —— 看起来是逐帧换画，不是补间。
 
@@ -24,10 +25,10 @@
   const { RAMP, C, clamp, lerp, smooth, rnd } = window.PIX;
   const TAU = Math.PI * 2, REF = 600;
   const SPEC = {
-    him: { headR: 66, sw: 60, hw: 34, upper: 108, fore: 92, thigh: 140, shin: 132, armR: [27, 22, 21, 18], legR: [31, 27, 26, 22],
-      top: RAMP.hood, bottom: RAMP.pants, hair: RAMP.hairHim, shoe: RAMP.shoeHim },
-    her: { headR: 64, sw: 50, hw: 30, upper: 100, fore: 88, thigh: 140, shin: 132, armR: [22, 19, 18, 16], legR: [21, 18, 17, 15],
-      top: RAMP.sweater, bottom: [0, 13], skirt: RAMP.skirt, hair: RAMP.hairHer, shoe: RAMP.shoeHer },
+    him: { headR: 66, sw: 60, hw: 34, upper: 108, fore: 92, thigh: 140, shin: 132, armR: [25, 21, 20, 17], legR: [32, 28, 27, 24],
+      top: RAMP.tee, sleeve: 0.5, bottom: RAMP.jeans, hair: RAMP.hairHim, shoe: 'slide' },
+    her: { headR: 64, sw: 50, hw: 30, upper: 100, fore: 88, thigh: 140, shin: 132, armR: [19, 17, 16, 14], legR: [25, 22, 21, 18],
+      top: RAMP.cami, sleeve: 0, bottom: RAMP.jeans, hair: RAMP.hairHer, shoe: RAMP.shoeHer },
   };
   const HIP_Y = -280, TORSO = 175, NECK = 24;
   const dir = (a) => [Math.sin(a), Math.cos(a)];
@@ -102,12 +103,16 @@
     const toU = (x) => (x - cx) * flip, toV = (y) => y - cy;
     const big = R >= 10;
     const skinC = (x, y) => G.dith(RAMP.skin, 0.55 + L(x, y) * 0.9 - (toU(x) > 0.3 * R && view !== 'side' ? 0.3 : 0), x, y);
-    const hairC = (x, y) => G.dith(S.hair, 0.35 + L(x, y) * (who === 'her' ? 1.6 : 0.9) - toV(y) / (R * 3), x, y);
+    const hairC = who === 'her' ? (x, y) => G.dith(S.hair, 0.3 + L(x, y) * 1.3 + toV(y) / (R * 3.2), x, y)   // 发根深、发尾亮
+      : (x, y) => G.dith(S.hair, 0.3 + L(x, y) * 0.9 - toV(y) / (R * 3), x, y);
     // 她：脑后的长发（在脸后面）
     if (who === 'her') {
-      const back = view === 'side' ? (u, v) => u > -0.15 * R && u < 1.12 * R && v > -0.85 * R && v < 1.85 * R - Math.max(0, u - 0.6 * R) * 0.8
-        : (u, v) => Math.abs(u) < 1.1 * R && v > -0.6 * R && v < 1.8 * R - Math.abs(u) * 0.3;
-      G.shape([cx - 1.3 * R, cy - R, cx + 1.3 * R, cy + 2 * R], (x, y) => back(toU(x), toV(y)), hairC, 0);
+      const jag = (u) => (Math.floor((u + 3 * R) / Math.max(1.5, R * 0.3)) % 2 ? 0.16 * R : 0);
+      const back = view === 'side' ? (u, v) => u > -0.15 * R && u < 1.15 * R && v > -0.85 * R && v < 2.7 * R - Math.max(0, u - 0.7 * R) * 0.6 - jag(u)
+        : view === 'back' ? (u, v) => Math.abs(u) < 1.15 * R && v > -0.6 * R && v < 2.8 * R - Math.abs(u) * 0.25 - jag(u)
+        : (u, v) => (Math.abs(u) < 1.15 * R && v > -0.6 * R && v < 0.95 * R) || (Math.abs(u) > 0.5 * R && Math.abs(u) < 1.12 * R && v < 2.3 * R - jag(u));
+      const round = (u, v) => v > 0 || (u / (1.15 * R)) ** 2 + (v / (1.02 * R)) ** 2 <= 1;   // 头顶是圆的，不出方角
+      G.shape([cx - 1.3 * R, cy - R, cx + 1.3 * R, cy + 3 * R], (x, y) => { const u = toU(x), v = toV(y); return round(u, v) && back(u, v); }, hairC, 0);
     }
     // 耳朵（正面、背面两边各一个）
     if (view !== 'side') [-1, 1].forEach((s) => G.ellipse(cx + s * R * 0.98, cy + R * 0.1, Math.max(0.8, R * 0.16), Math.max(1, R * 0.24), skinC, 0));
@@ -116,15 +121,24 @@
       : (u, v) => (u / R) ** 2 + (v / (1.02 * R)) ** 2 <= 1;
     let hair;
     if (view === 'back') hair = () => true;
-    else if (who === 'him') hair = view === 'side'
-      ? (u, v) => v < -0.32 * R || (u > 0.1 * R && v < 0.42 * R - Math.max(0, 0.6 * R - u) * 0.2) || (u < -0.45 * R && v < -0.12 * R)
-      : (u, v) => v < -0.22 * R - (Math.floor((u + 2 * R) / Math.max(1.5, R * 0.36)) % 2 ? 0.14 * R : 0) || (Math.abs(u) > 0.84 * R && v < 0.05 * R);
+    else if (who === 'him') {
+      const zig = (u) => (Math.floor((u + 3 * R) / Math.max(1.5, R * 0.28)) % 3) * 0.09 * R;
+      hair = view === 'side'
+        ? (u, v) => v < -0.3 * R || (u > 0.05 * R && v < 0.5 * R - Math.max(0, 0.5 * R - u) * 0.3) || (u < -0.3 * R && v < -0.02 * R - zig(u))
+        : (u, v) => v < -0.06 * R - zig(u) || (Math.abs(u) > 0.8 * R && v < 0.2 * R);
+    }
     else hair = view === 'side'
       ? (u, v) => v < -0.36 * R || u > -0.08 * R && v < 0.95 * R || (u < -0.5 * R && v < -0.18 * R)
       : (u, v) => v < -0.3 * R - Math.abs(u) * 0.12 + (Math.abs(u) < 0.08 * R ? -0.2 * R : 0) || Math.abs(u) > 0.74 * R;
+    // 他的蓬发：比头大一圈、边上一簇一簇翘起来；先垫在脸后面，画完脸再把脸上沿的轮廓线盖掉
+    const blob = (u, v) => { const yy = v + 0.16 * R, a = Math.atan2(yy, u), b = 1 + 0.09 * Math.sin(a * 9 + 0.7) + 0.05 * Math.sin(a * 14);
+      const lim = view === 'side' ? (v < -0.05 * R || (u > 0 && v < 0.45 * R)) : v < 0.12 * R;
+      return lim && (u / (1.1 * R)) ** 2 + (yy / (1.0 * R)) ** 2 <= b * b; };
+    const hb = [cx - 1.4 * R, cy - 1.4 * R, cx + 1.4 * R, cy + 1.2 * R];
+    if (who === 'him') G.shape(hb, (x, y) => blob(toU(x), toV(y)), hairC, 0);
     G.shape([cx - 1.2 * R, cy - 1.1 * R, cx + 1.2 * R, cy + 1.1 * R], (x, y) => face(toU(x), toV(y)), (x, y) => (hair(toU(x), toV(y)) ? hairC(x, y) : skinC(x, y)), 0);
+    if (who === 'him') G.shape(hb, (x, y) => { const u = toU(x), v = toV(y); return blob(u, v) && (hair(u, v) || !face(u, v)); }, hairC, null);
     if (view === 'side') G.ellipse(cx + flip * R * 0.16, cy + R * 0.12, Math.max(0.8, R * 0.13), Math.max(1, R * 0.2), (x, y) => G.dith(RAMP.skin, 0.3 + L(x, y) * 0.6, x, y), 0);   // 侧面的耳朵
-    if (who === 'her') { const [hu, hv] = view === 'side' ? [-0.05 * R, -0.55 * R] : view === 'back' ? [-0.3 * R, -0.6 * R] : [0.3 * R, -0.58 * R]; G.rect(Math.round(cx + flip * hu), Math.round(cy + hv), Math.max(2, Math.round(R * 0.3)), Math.max(1, Math.round(R * 0.12)), C.red); }
     if (view === 'back') return;
     // 五官
     const ex = view === 'side' ? [-0.5 * R] : [-0.36 * R, 0.36 * R], ey = cy + Math.round(0.12 * R);
@@ -139,7 +153,7 @@
         else { G.px(x, ey, 0); if (R >= 7) G.px(x, ey - 1, 0); }
         if (e === 'sad' || e === 'cry') { G.px(x + inner, ey - 3, 0); G.px(x, ey - 2, 0); }
         if (e === 'cry') { G.px(x, ey + 2, C.phone); G.px(x, ey + 3, C.phone); }
-        if (e === 'shy' || e === 'happy') G.px(x - inner * (view === 'side' ? 0 : 1), ey + 2, C.pink);
+        if (e === 'shy' || e === 'happy') G.px(x - inner * (view === 'side' ? 0 : 1), ey + 2, C.blush);
         return;
       }
       const s = R / 14;   // 细节版：头半径 14 时的像素尺寸
@@ -148,7 +162,7 @@
       else { G.ellipse(x, ey, Math.max(1, 1.2 * s), Math.max(1.4, 1.9 * s), 0, null); G.px(x - Math.round(0.5 * s), ey - Math.round(0.9 * s), C.white); }
       if (e === 'sad' || e === 'cry') G.line(x + inner * Math.round(2 * s), ey - Math.round(3.2 * s), x - inner * Math.round(1.6 * s), ey - Math.round(4.4 * s), 0);
       if (e === 'cry') { G.ellipse(x - inner * Math.round(0.4 * s), ey + Math.round(3.6 * s), Math.max(1, 0.9 * s), Math.max(1.2, 1.4 * s), C.phone, 0); }
-      if (e === 'shy' || e === 'happy') G.ellipse(x - inner * Math.round(1.2 * s) * (view === 'side' ? 0 : 1), ey + Math.round(2.8 * s), 2.2 * s, 1 * s, (xx, yy) => G.dith([C.skin, C.pink], e === 'shy' ? 1.1 : 0.7, xx, yy), null);
+      if (e === 'shy' || e === 'happy') G.ellipse(x - inner * Math.round(1.2 * s) * (view === 'side' ? 0 : 1), ey + Math.round(2.8 * s), 2.2 * s, 1 * s, (xx, yy) => G.dith([C.skin, C.blush], e === 'shy' ? 1.1 : 0.7, xx, yy), null);
     });
     const mx = X(mU), w = big ? Math.max(1, Math.round(R * 0.14)) : 1;
     if (e === 'happy') { G.line(mx - w, my - 1, mx, my + (big ? 1 : 0), C.skinDk); G.line(mx, my + (big ? 1 : 0), mx + w, my - 1, C.skinDk); if (big) G.px(mx, my, 31); }
@@ -166,34 +180,49 @@
     const shade = (ramp, base, gain = 1.4) => (x, y) => G.dith(ramp, base + light(x, y) * gain, x, y);
     const r = (v) => Math.max(1, v * k);
     const drawArm = (A, far) => {
-      const top = shade(S.top, far ? 0.1 : 0.55);
-      G.limb(W(A.sh), W(A.el), r(S.armR[0]), r(S.armR[1]), top);
-      G.limb(W(A.el), W(A.wr), r(S.armR[2]), r(S.armR[3]), top);
-      const hd = W(add(A.wr, dir(A.f), 6)); G.ellipse(hd[0], hd[1], r(S.armR[3] + 2), r(S.armR[3] + 3), shade(RAMP.skin, far ? 0.1 : 0.5, 0.9), 0);
+      const sk = shade(RAMP.skin, far ? 0.1 : 0.5, 0.9);
+      G.limb(W(A.sh), W(A.el), r(S.armR[0]), r(S.armR[1]), sk);
+      G.limb(W(A.el), W(A.wr), r(S.armR[2]), r(S.armR[3]), sk);
+      const hd = W(add(A.wr, dir(A.f), 6)); G.ellipse(hd[0], hd[1], r(S.armR[3] + 2), r(S.armR[3] + 3), sk, 0);
+      if (S.sleeve > 0) { const m = add(A.sh, dir(A.s), S.upper * S.sleeve); G.limb(W(A.sh), W(m), r(S.armR[0] + 6), r(S.armR[0] + 4), shade(S.top, far ? 0.2 : 0.75, 1.3)); }
     };
     const drawLeg = (Lg, far) => {
       const b = shade(S.bottom, far ? 0 : 0.35, 1.0);
       const an = W(Lg.an);
-      if (J.side) { const toe = mx; G.poly([[an[0] - toe * r(56), an[1] - r(10)], [an[0] + toe * r(20), an[1] - r(12)], [an[0] + toe * r(22), an[1] + r(14)], [an[0] - toe * r(60), an[1] + r(14)]], shade(S.shoe, far ? 0.2 : 0.6, 1.2), 0); }
+      const toe = mx, sk = shade(RAMP.skin, far ? 0.1 : 0.45, 0.8);
+      if (S.shoe === 'slide') {
+        if (J.side) {
+          G.poly([[an[0] - toe * r(54), an[1] - r(4)], [an[0] + toe * r(16), an[1] - r(10)], [an[0] + toe * r(18), an[1] + r(10)], [an[0] - toe * r(58), an[1] + r(10)]], sk, 0);
+          G.poly([[an[0] - toe * r(46), an[1] - r(8)], [an[0] - toe * r(6), an[1] - r(12)], [an[0] - toe * r(4), an[1] + r(6)], [an[0] - toe * r(48), an[1] + r(6)]], shade(RAMP.slide, far ? 0.2 : 0.8, 0.6), 0);
+          G.line(an[0] - toe * r(62), an[1] + r(14), an[0] + toe * r(22), an[1] + r(14), C.slipper);
+        } else { G.ellipse(an[0], an[1] + r(4), r(24), r(12), sk, 0); G.rect(Math.round(an[0] - r(22)), Math.round(an[1] - r(2)), Math.round(r(44)), Math.max(1, Math.round(r(9))), C.slipper); G.line(an[0] - r(26), an[1] + r(16), an[0] + r(26), an[1] + r(16), C.slipper); }
+      } else if (J.side) G.poly([[an[0] - toe * r(56), an[1] - r(10)], [an[0] + toe * r(20), an[1] - r(12)], [an[0] + toe * r(22), an[1] + r(14)], [an[0] - toe * r(60), an[1] + r(14)]], shade(S.shoe, far ? 0.2 : 0.6, 1.2), 0);
       else G.ellipse(an[0], an[1] + r(4), r(28), r(14), shade(S.shoe, 0.6, 1.2), 0);
       G.limb(W(Lg.kn), W(Lg.an), r(S.legR[2]), r(S.legR[3]), b);
       G.limb(W(Lg.hp), W(Lg.kn), r(S.legR[0]), r(S.legR[1]), b);
     };
     const rot = (p) => { const th = -J.P.lean, c = Math.cos(th), s = Math.sin(th); return W([J.hip[0] + p[0] * c - p[1] * s, J.hip[1] + p[0] * s + p[1] * c]); };
+    const toLocal = (x, y) => { const dx = (x - ox) / (k * mx * J.P.sx) - J.hip[0], dy = (y - oy) / (k * J.P.sy) - J.hip[1], c = Math.cos(J.P.lean), s = Math.sin(J.P.lean); return [dx * c - dy * s, dx * s + dy * c]; };
     const drawTorso = () => {
       const side = J.side, sw = side ? 40 : S.sw + 8, hw = side ? 34 : S.hw + 12;
       const body = [[-hw, 18], [hw, 18], [hw + 4, -40], [sw, -TORSO + 20], [sw - 16, -TORSO - 4], [-sw + 16, -TORSO - 4], [-sw, -TORSO + 20], [-hw - 4, -40]].map(rot);
-      const top = shade(S.top, 0.5, 1.5);
-      if (o.who === 'him' && J.view !== 'front') { const c = rot(side ? [32, -TORSO + 6] : [0, -TORSO + 34]); G.ellipse(c[0], c[1], r(side ? 30 : 54), r(side ? 44 : 40), shade(S.top, 0.2, 1.2), 0); }   // 帽子
-      G.poly(body, top, 0);
-      if (o.who === 'him') {
-        if (J.view === 'front') { G.poly([[-40, -16], [40, -16], [32, -66], [-32, -66]].map(rot), shade(S.top, 0, 1.2), null); const a = rot([-12, -TORSO + 10]), b = rot([-13, -TORSO + 64]), c = rot([12, -TORSO + 10]), d = rot([13, -TORSO + 64]); G.line(a[0], a[1], b[0], b[1], 7); G.line(c[0], c[1], d[0], d[1], 7); }
-        const h0 = rot([-hw, 10]), h1 = rot([hw, 10]); G.line(h0[0], h0[1], h1[0], h1[1], S.top[0]);   // 下摆罗纹
-      } else if (o.who === 'her') {
-        const sk = [[-(side ? 34 : 44), -22], [side ? 34 : 44, -22], [side ? 64 : 86, 140], [-(side ? 64 : 86), 140]].map((p) => W([J.hip[0] + p[0], J.hip[1] + p[1]]));
-        G.poly(sk, shade(S.skirt, 0.45, 1.2), 0);
-        for (const f of [-0.4, 0, 0.4]) { const a = W([J.hip[0] + f * 34, J.hip[1] - 14]), b = W([J.hip[0] + f * 86, J.hip[1] + 132]); G.line(a[0], a[1], b[0], b[1], S.skirt[0]); }
-      }
+      const top = shade(S.top, o.who === 'him' ? 0.6 : 0.5, 1.5), skin = shade(RAMP.skin, 0.45, 0.9), jeans = shade(S.bottom, 0.35, 1.0);
+      let col;
+      if (o.who === 'him') col = (x, y) => {
+        const [lx, ly] = toLocal(x, y);
+        if (!side && J.view === 'front' && Math.abs(lx) < 24 && ly < -TORSO + 2 + 16 * (1 - (lx / 24) ** 2)) return skin(x, y);           // 圆领
+        if (S.sleeve === 0 && !side && Math.abs(lx) > sw - 18 && ly < -TORSO + 70) return skin(x, y);                                      // 背心的袖窿
+        return top(x, y);
+      };
+      else col = (x, y) => {
+        const [lx, ly] = toLocal(x, y);
+        if (ly > 4) return jeans(x, y);                                                                                                     // 吊带塞进牛仔裤
+        const strap = side ? Math.abs(lx) < 7 : Math.abs(Math.abs(lx) - S.sw * 0.55) < 7;
+        if (ly < -TORSO + 42 && !strap) return skin(x, y);                                                                                  // 露肩
+        return top(x, y);
+      };
+      G.poly(body, col, 0);
+      if (o.who === 'him') { const h0 = rot([-hw, 12]), h1 = rot([hw, 12]); G.line(h0[0], h0[1], h1[0], h1[1], S.top[0]); }               // 下摆
     };
     const drawHead = () => { const h = W(J.head); drawHeadAt(G, h[0], h[1] - (J.P.tilt > 0.3 && J.side ? 0 : 0), S.headR * k, o, J.view, mx, light); };
     const neck = () => { const a = W(J.neck), b = W(add(J.neck, [0, 20])); G.limb(a, b, r(16), r(16), shade(RAMP.skin, 0.2, 0.8), null); };
