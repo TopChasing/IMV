@@ -244,3 +244,5 @@ projects/*/mv/.hyperframes/
 projects/*/sketches/
 projects/*/storyboard.png
 projects/*/review/
+# 本地工具，不公开
+tools/ncm2music.py
