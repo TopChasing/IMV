@@ -1,0 +1,229 @@
+<!doctype html>
+<!--
+  《唉》画风样图 · 像素游戏风（4:3，320×240 逻辑画布 ×6 = 1920×1440）
+  开场画面：夜里的出租屋，吊灯下一张桌子、两副碗筷；左边的凳子空着，他低头坐在右边看手机；墙上钉着一张海的明信片。
+  画法：一切画进 320×240 的调色板索引缓冲（32 色），渐变全用 4×4 Bayer 抖动；灯光 = 按到灯的距离在同一材质的色阶里往亮处抖；
+  形状都在小画布上光栅化再自动描 1 像素轮廓；字用 Fusion Pixel 12px 在原尺寸画、alpha 二值化。画面只由 t 决定。
+-->
+<html lang="zh-CN"><head><meta charset="UTF-8" />
+<style>html, body { margin: 0; overflow: hidden; background: #000; } canvas { display: block; image-rendering: pixelated; }</style>
+<script src="../../lyrics.js"></script>
+</head><body><canvas id="out"></canvas>
+<script>
+const LW = 320, LH = 240;
+const SCALE = Math.max(1, Math.floor(Math.min((window.innerWidth || 1920) / LW, (window.innerHeight || 1440) / LH)));
+const LINE = Number(new URLSearchParams(location.search).get('line') || 17) - 1;   // 第几句歌词（1 起）
+const LYRIC = (window.LYRICS && window.LYRICS[LINE]) ? window.LYRICS[LINE][2] : '';
+const FONT_URL = '../../../../assets/fonts/fusion-pixel-12px-zh_hans.woff2';
+
+const PAL = [
+  '#0b0d1a', '#151a33', '#1f2747', '#2c365e', '#3e4a78', '#5a6796', '#8b95bd', '#c9d0e6', '#f1f3fa', // 0-8 墨蓝 → 冷白
+  '#221c2c', '#30283c', '#43384d', '#5e4d5a', '#7d6563',                                          // 9-13 墙：暗 → 被灯照到的暖灰
+  '#2e211d', '#4a3429', '#6e4d35', '#9a6e46', '#c4955f',                                          // 14-18 木
+  '#252a38', '#3d4456', '#5f677b',                                                                // 19-21 卫衣
+  '#171a26',                                                                                      // 22 裤子
+  '#9c6a55', '#d39a78',                                                                           // 23-24 皮肤
+  '#ffd36b', '#fff2c4', '#e0973e',                                                                // 25-27 灯（全片唯一强调色）、灯芯、琥珀
+  '#bfe2ee',                                                                                      // 28 手机屏的冷光
+  '#2f6f8a', '#62a9b9',                                                                           // 29-30 明信片里的海
+  '#eee5cf',                                                                                      // 31 米饭、纸
+];
+const RGB = PAL.map((h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)));
+const RAMP = { wall: [9, 10, 11, 12, 13], floor: [14, 15, 16, 17], wood: [14, 15, 16, 17, 18], hood: [19, 20, 21], skin: [23, 24], pants: [22, 19], sky: [1, 2, 3, 4], porcelain: [5, 6, 7, 8] };
+
+const B = new Uint8Array(LW * LH);
+const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+const bt = (x, y) => (BAYER[(y & 3) * 4 + (x & 3)] + 0.5) / 16;
+function hash(s) { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } h ^= h >>> 13; h = Math.imul(h, 0x5bd1e995); h ^= h >>> 15; return h >>> 0; }
+const rnd = (k) => hash(k) / 4294967296;
+const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
+function px(x, y, c) { x = Math.round(x); y = Math.round(y); if (x >= 0 && y >= 0 && x < LW && y < LH) B[y * LW + x] = c; }
+function dith(ramp, v, x, y) { const f = clamp(v, 0, ramp.length - 1.0001); const k = Math.floor(f); return (f - k) > bt(x, y) ? ramp[k + 1] : ramp[k]; }
+
+// ---------- 光：吊灯在 (160, 47)，往下一个光锥 ----------
+const LAMP = [160, 47];
+function L(x, y) {
+  const dx = x - LAMP[0], dy = y - LAMP[1];
+  let I = clamp(1 - Math.hypot(dx, dy * 1.15) / 120) * 0.9;              // 灯四周
+  if (dy > 0) { const w = 12 + dy * 0.9; I = Math.max(I, clamp(1 - Math.abs(dx) / w) * clamp(1.25 - dy / 170)); }   // 光锥
+  return I;
+}
+
+// ---------- 形状：在小画布上光栅化，自动描 1 像素轮廓 ----------
+function inPoly(pts, x, y) { let c = false; for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) { const [xi, yi] = pts[i], [xj, yj] = pts[j]; if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) c = !c; } return c; }
+function shape(bb, inside, colorFn, outline = 0) {
+  const cells = [];
+  for (let y = bb[1]; y <= bb[3]; y++) for (let x = bb[0]; x <= bb[2]; x++) if (inside(x + 0.5, y + 0.5)) cells.push([x, y]);
+  if (outline !== null) {
+    const set = new Set(cells.map(([x, y]) => y * 1024 + x));
+    for (const [x, y] of cells) for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (!set.has((y + dy) * 1024 + x + dx)) px(x + dx, y + dy, outline);
+  }
+  for (const [x, y] of cells) px(x, y, colorFn(x, y));
+}
+const bbox = (pts, m = 1) => [Math.floor(Math.min(...pts.map((p) => p[0]))) - m, Math.floor(Math.min(...pts.map((p) => p[1]))) - m, Math.ceil(Math.max(...pts.map((p) => p[0]))) + m, Math.ceil(Math.max(...pts.map((p) => p[1]))) + m];
+const poly = (pts, colorFn, outline = 0) => shape(bbox(pts), (x, y) => inPoly(pts, x, y), colorFn, outline);
+const ellipse = (cx, cy, rx, ry, colorFn, outline = 0) => shape([Math.floor(cx - rx) - 1, Math.floor(cy - ry) - 1, Math.ceil(cx + rx) + 1, Math.ceil(cy + ry) + 1], (x, y) => ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 <= 1, colorFn, outline);
+function limb(a, b, r, colorFn, outline = 0) {   // 胶囊：手臂、腿
+  const [ax, ay] = a, [bx, by] = b, L2 = (bx - ax) ** 2 + (by - ay) ** 2;
+  shape(bbox([a, b], r + 1), (x, y) => { const u = clamp(((x - ax) * (bx - ax) + (y - ay) * (by - ay)) / L2); return Math.hypot(x - ax - u * (bx - ax), y - ay - u * (by - ay)) <= r; }, colorFn, outline);
+}
+const lit = (ramp, base, k) => (x, y) => dith(RAMP[ramp], base + L(x, y) * k, x, y);
+
+// ---------- 房间 ----------
+const FLOOR = 172;
+function drawRoom(t) {
+  for (let y = 0; y < FLOOR; y++) for (let x = 0; x < LW; x++) px(x, y, dith(RAMP.wall, 0.55 + L(x, y) * 3.6 - (y < 6 ? 0.4 : 0), x, y));
+  for (let x = 0; x < LW; x++) { px(x, FLOOR - 3, 9); px(x, FLOOR - 2, dith([14, 15], 0.3 + L(x, FLOOR) * 1.5, x, 0)); px(x, FLOOR - 1, 14); }   // 踢脚线
+  for (let y = FLOOR; y < LH; y++) {
+    const row = Math.floor((y - FLOOR) / 9);
+    for (let x = 0; x < LW; x++) {
+      const joint = (x + row * 37) % 71 === 0, seam = (y - FLOOR) % 9 === 0;
+      px(x, y, seam || joint ? 14 : dith(RAMP.floor, 0.4 + L(x, y) * 2.2 + (y - FLOOR) / 160, x, y));
+    }
+  }
+}
+function drawWindow(t) {
+  const X0 = 20, Y0 = 34, X1 = 104, Y1 = 118;
+  for (let y = Y0; y <= Y1; y++) for (let x = X0; x <= X1; x++) px(x, y, dith(RAMP.sky, 0.3 + ((y - Y0) / (Y1 - Y0)) * 2.4, x, y));
+  // 远处的楼：剪影 + 零星亮着的窗
+  const blocks = [[20, 78, 14], [33, 66, 12], [44, 86, 16], [59, 58, 11], [69, 74, 13], [81, 90, 10], [90, 70, 15]];
+  blocks.forEach(([bx, by, bw], i) => {
+    for (let y = by; y <= Y1; y++) for (let x = bx; x < Math.min(bx + bw, X1 + 1); x++) px(x, y, 1);
+    for (let y = by + 3; y < Y1 - 2; y += 4) for (let x = bx + 2; x < Math.min(bx + bw - 1, X1); x += 3) {
+      const on = rnd('w' + i + ':' + x + ':' + y) < 0.22, blink = rnd('wb' + i + x + y + ':' + Math.floor(t * 0.5)) < 0.04;
+      if (on && !blink) { px(x, y, 27); if (rnd('w2' + x + y) < 0.4) px(x, y + 1, 27); }
+    }
+  });
+  for (let i = 0; i < 9; i++) { const sx = X0 + 4 + Math.floor(rnd('st' + i) * 78), sy = Y0 + 3 + Math.floor(rnd('sy' + i) * 22); if (rnd('tw' + i + ':' + Math.floor(t * 3)) < 0.8) px(sx, sy, i % 3 ? 6 : 7); }
+  // 窗框、十字窗棂、窗台
+  const frame = (x, y) => dith([14, 15, 16], 0.6 + L(x, y) * 1.4, x, y);
+  shape([X0 - 4, Y0 - 4, X1 + 4, Y1 + 4], (x, y) => x < X0 || x > X1 + 1 || y < Y0 || y > Y1 + 1 || Math.abs(x - (X0 + X1 + 1) / 2) < 1.5 || Math.abs(y - 76) < 1.5, frame, 0);
+  poly([[X0 - 8, Y1 + 4], [X1 + 8, Y1 + 4], [X1 + 6, Y1 + 9], [X0 - 6, Y1 + 9]], lit('wood', 1.2, 2), 0);
+  for (let y = Y0; y <= Y1; y += 1) if ((y & 1) === 0) px(X0 + 3, y, 5);                                       // 玻璃反光一条
+}
+function drawPostcard(t) {   // 海的明信片，四角胶带，微微歪
+  const X = 196, Y = 54, w = 34, h = 22;
+  const pts = [[X, Y + 1], [X + w, Y], [X + w + 1, Y + h], [X + 1, Y + h + 1]];
+  poly(pts, (x, y) => {
+    const v = y - Y;
+    if (v < 9) return dith([7, 8], 0.3 + v / 12 + L(x, y) * 0.6, x, y);
+    if (v < 10) return 30;
+    return dith([29, 30], 1.1 - (v - 10) / 12 + L(x, y) * 0.5, x, y);
+  }, 0);
+  for (let x = X + 3; x < X + w - 2; x += 5) px(x + ((x >> 2) & 1), Y + 13 + ((x >> 3) & 1), 8);                 // 浪花
+  [[X - 1, Y - 1], [X + w - 3, Y - 2], [X + w - 2, Y + h - 1], [X, Y + h]].forEach(([x, y]) => { px(x, y, 31); px(x + 1, y, 31); px(x + 2, y + 1, 31); px(x + 1, y + 1, 31); });
+}
+function drawLamp(t) {
+  for (let y = 0; y < 37; y++) px(LAMP[0], y, 0);
+  poly([[154, 36], [166, 36], [177, 46], [143, 46]], (x, y) => dith([2, 3, 4], 0.4 + (y - 36) / 8 + (x < 160 ? 0.6 : 0), x, y), 0);
+  for (let x = 145; x <= 175; x++) px(x, 46, 27);
+  ellipse(160, 48, 3, 2, (x, y) => (Math.hypot(x - 160, y - 48) < 1.6 ? 26 : 25), null);
+  // 光锥里飘的灰尘，一秒换 4 次
+  const k = Math.floor(t * 4);
+  for (let i = 0; i < 14; i++) {
+    const y = 60 + ((rnd('d' + i) * 85 + t * (2 + rnd('ds' + i) * 3)) % 85), x = 160 + (rnd('dx' + i) - 0.5) * (20 + (y - 47) * 1.6) + Math.sin(t * 0.7 + i) * 2;
+    if (rnd('dk' + i + ':' + k) < 0.75) px(x, y, i % 4 ? 25 : 26);
+  }
+}
+// ---------- 桌子、凳子、碗筷 ----------
+function drawFurniture(t) {
+  // 地上桌子、凳子的影子（灯在正上方）
+  for (let y = FLOOR + 14; y < FLOOR + 30; y++) for (let x = 90; x < 236; x++) if (((x - 162) / 78) ** 2 + ((y - FLOOR - 22) / 8) ** 2 < 1 && bt(x, y) < 0.7) px(x, y, 14);
+  // 空凳子（她的位置）
+  poly([[62, 171], [94, 171], [94, 175], [62, 175]], lit('wood', 1.0, 2.6), 0);
+  [[65, 175, 68], [89, 175, 92]].forEach(([x0, y0, x1]) => poly([[x0, y0], [x1, y0], [x1 + 1, 205], [x0 - 1, 205]], lit('wood', 0.4, 1.4), 0));
+  poly([[66, 192], [91, 192], [91, 194], [66, 194]], lit('wood', 0.3, 1), 0);
+  // 桌子
+  poly([[100, 153], [104, 153], [105, 200], [99, 200]], lit('wood', 0.5, 1.6), 0);
+  poly([[218, 153], [222, 153], [223, 200], [217, 200]], lit('wood', 0.4, 1.5), 0);
+  poly([[93, 147], [229, 147], [229, 151], [93, 151]], lit('wood', 1.6, 2.4), 0);         // 桌面（亮的那条）
+  poly([[95, 151], [227, 151], [227, 157], [95, 157]], lit('wood', 0.6, 1.8), 0);         // 桌沿
+}
+function bowl(cx, full) {
+  poly([[cx - 9, 140], [cx + 9, 140], [cx + 7, 145], [cx + 3, 147], [cx - 3, 147], [cx - 7, 145]], (x, y) => (y === 141 ? 4 : dith(RAMP.porcelain, 1.2 + L(x, y) * 2 - (x - cx) / 14, x, y)), 0);
+  if (full) ellipse(cx, 139, 7.5, 3.2, (x, y) => dith([30, 31, 8], 0.8 + L(x, y) * 1.6 - (y - 137) / 4, x, y), 0);
+}
+function drawTableTop(t) {
+  bowl(128, true);                                                                          // 她那碗：米饭没动
+  for (let x = 117; x <= 142; x++) { px(x, 135, 17); px(x + 1, 137, 16); }                   // 筷子并排架在碗上，摆得整整齐齐
+  bowl(190, false);                                                                         // 他那碗：空的
+  limb([176, 146], [196, 146.5], 0.5, () => 17, null); limb([177, 145], [197, 145], 0.5, () => 16, null); // 筷子随手放在桌上
+}
+// ---------- 他：坐在右边，低着头看手机 ----------
+function drawHim(t) {
+  const breathe = Math.round(Math.sin(t * Math.PI * 2 / 4) * 0.6);      // 4 秒一次很轻的呼吸，整像素
+  // 凳子
+  poly([[236, 176], [270, 176], [270, 180], [236, 180]], lit('wood', 0.8, 2), 0);
+  [[239, 180, 242], [264, 180, 267]].forEach(([x0, y0, x1]) => poly([[x0, y0], [x1, y0], [x1 + 1, 206], [x0 - 1, 206]], lit('wood', 0.3, 1.2), 0));
+  // 腿
+  const pants = lit('pants', 0.3, 1.2);
+  limb([252, 172], [232, 176], 5.5, pants); limb([232, 176], [233, 199], 4.5, pants);
+  poly([[226, 199], [239, 199], [240, 204], [224, 204]], () => 0, 0);
+  // 身子：往桌子那边佝着
+  const sh = breathe;
+  poly([[240, 177], [264, 177], [262, 160], [256, 143 + sh], [244, 139 + sh], [233, 144 + sh], [231, 156]], lit('hood', 0.5, 2.2), 0);
+  limb([258, 150 + sh], [246, 142 + sh], 1, () => 19, null);                               // 背上的帽子褶
+  // 头：低着，几乎只看得见头顶和一点侧脸
+  ellipse(229, 136 + sh, 8.5, 8.5, (x, y) => {
+    const face = x < 227 && y > 136 + sh;
+    if (face) { const d = Math.hypot(x - 211, y - 143); return d < 17 && bt(x, y) < 0.18 ? 28 : dith(RAMP.skin, 0.2 + L(x, y) * 0.8 + (d < 19 ? 0.5 : 0), x, y); }   // 侧脸只被手机照亮一点
+    return dith([0, 19, 20], 0.6 + L(x, y) * 2.2 + (x - 229) / 12, x, y);                  // 头发
+  }, 0);
+  // 手臂：小臂搁在桌沿，两只手捧着手机
+  const sleeve = lit('hood', 0.7, 2.4);
+  limb([242, 147 + sh], [228, 150], 4, sleeve); limb([228, 150], [214, 146], 3.2, sleeve);
+  ellipse(212, 145, 2.6, 2.2, (x, y) => (bt(x, y) < 0.55 ? 24 : 28), 0);
+  poly([[207, 139], [212, 138], [213, 145], [208, 146]], (x, y) => (x === 207 || y === 146 ? 7 : 28), 0);   // 手机屏
+  for (let i = 0; i < 10; i++) { const a = rnd('ph' + i) * Math.PI, r = 4 + rnd('pr' + i) * 7; const x = 210 + Math.cos(a) * r, y = 142 - Math.sin(a) * r * 0.6; if (B[Math.round(y) * LW + Math.round(x)] >= 19 && bt(Math.round(x), Math.round(y)) < 0.3) px(x, y, 28); }
+}
+// ---------- UI：三颗心（只剩一颗）、对话框歌词 ----------
+const HEART = ['.kk.kk.', 'kxxkxxk', 'kxxxxxk', '.kxxxk.', '..kxk..', '...k...'];
+function drawHUD() {
+  for (let i = 0; i < 3; i++) HEART.forEach((row, j) => [...row].forEach((ch, k) => { if (ch !== '.') px(8 + i * 9 + k, 8 + j, ch === 'k' ? 0 : (i === 0 ? 25 : 2)); }));
+  px(9, 9, 26);
+}
+const GLYPHS = {};
+function buildGlyphs(family) {
+  const cv = document.createElement('canvas'); cv.width = 32; cv.height = 32;
+  const g = cv.getContext('2d', { willReadFrequently: true });
+  for (const ch of new Set(LYRIC)) {
+    g.clearRect(0, 0, 32, 32); g.fillStyle = '#fff'; g.textBaseline = 'top'; g.font = `12px ${family}`; g.fillText(ch, 2, 2);
+    const d = g.getImageData(0, 0, 32, 32).data, bits = [];
+    for (let y = 0; y < 32; y++) for (let x = 0; x < 32; x++) if (d[(y * 32 + x) * 4 + 3] > 127) bits.push([x - 2, y - 2]);
+    GLYPHS[ch] = { adv: Math.max(4, Math.round(g.measureText(ch).width)), bits };
+  }
+}
+function text(str, x, y, c, sh) { let cx = x; for (const ch of str) { const gl = GLYPHS[ch]; if (!gl) continue; for (const [gx, gy] of gl.bits) px(cx + gx + 1, y + gy + 1, sh); for (const [gx, gy] of gl.bits) px(cx + gx, y + gy, c); cx += gl.adv; } }
+function drawDialog(t) {
+  const X = 8, Y = 210, W = 304, H = 26;
+  for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
+    if ((i === 0 || i === W - 1) && (j === 0 || j === H - 1)) continue;
+    const e = Math.min(i, j, W - 1 - i, H - 1 - j);
+    px(X + i, Y + j, e === 0 ? 0 : e === 1 ? 7 : e === 2 ? 4 : 1);
+  }
+  const n = clamp(Math.floor((t - 0.4) * 9) + 1, 0, [...LYRIC].length);
+  text([...LYRIC].slice(0, n).join(''), X + 12, Y + 7, 8, 3);
+  if (n >= [...LYRIC].length && Math.floor(t * 3) % 2 === 0) { const ax = X + W - 13, ay = Y + H - 8; for (let k = 0; k < 3; k++) for (let i = k; i < 5 - k; i++) px(ax + i, ay + k, 25); }
+}
+
+// ---------- 合成 ----------
+const out = document.getElementById('out'); out.width = LW * SCALE; out.height = LH * SCALE;
+const octx = out.getContext('2d');
+const small = document.createElement('canvas'); small.width = LW; small.height = LH;
+const sctx = small.getContext('2d'), IMG = sctx.createImageData(LW, LH);
+function drawFrame(t) {
+  B.fill(0);
+  drawRoom(t); drawWindow(t); drawPostcard(t); drawFurniture(t); drawHim(t); drawTableTop(t); drawLamp(t);
+  drawHUD(); drawDialog(t);
+  const d = IMG.data;
+  for (let i = 0; i < LW * LH; i++) { const c = RGB[B[i]]; d[i * 4] = c[0]; d[i * 4 + 1] = c[1]; d[i * 4 + 2] = c[2]; d[i * 4 + 3] = 255; }
+  sctx.putImageData(IMG, 0, 0); octx.imageSmoothingEnabled = false; octx.drawImage(small, 0, 0, LW * SCALE, LH * SCALE);
+}
+window.sceneReady = (async () => {
+  let family = '"FusionPixelZH"';
+  try { const ff = new FontFace('FusionPixelZH', `url(${FONT_URL})`); await ff.load(); document.fonts.add(ff); }
+  catch (e) { console.warn('像素字体没加载上，退回系统字体', e); family = '"Microsoft YaHei",sans-serif'; }
+  buildGlyphs(family); drawFrame(0);
+})();
+window.renderAt = async (t) => { drawFrame(t); return out.toDataURL('image/png'); };
+</script></body></html>

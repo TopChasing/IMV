@@ -1,0 +1,257 @@
+<!doctype html>
+<!--
+  《唉》画风样图 · 纸艺立体书（papercraft diorama，4:3，1920×1440）
+  同一个开场：夜里的出租屋，吊灯、两副碗筷、空凳子、低头看手机的他、墙上海的明信片。像桌上摆好的纸片微缩场景被拍下来。
+  画法（照 music-mv examples/diorama）：每样东西平涂画一次缓存成纸片（模切白边 + 刀口线 + 右下纸厚 + 自己的纸纹），
+  分层前后站开：窗外城市背板 → 墙（挖出窗洞）→ 地板 → 吊灯 → 家具/碗筷 → 他（关节纸偶）→ 前景糊掉的绿植。
+  每层：冷蓝环境光 multiply + 吊灯暖光 → 自发光（灯泡、窗外灯火、手机屏）→ 往后投软影子 → 按景深糊。一秒 12 张定格、手摆的抖动。
+-->
+<html lang="zh-CN"><head><meta charset="UTF-8" />
+<script src="../../lyrics.js"></script>
+<style>html, body { margin: 0; width: 1920px; height: 1440px; overflow: hidden; background: #141826; } canvas { display: block; }</style>
+</head><body><canvas id="out" width="1920" height="1440"></canvas>
+<script>
+const W = 1920, H = 1440, POSES = 12, TAU = Math.PI * 2;
+const M = 64, LW = W + 2 * M, LH = H + 2 * M;
+const LINE = Number(new URLSearchParams(location.search).get('line') || 17) - 1;
+const LYRIC = (window.LYRICS && window.LYRICS[LINE]) ? window.LYRICS[LINE][2] : '';
+const FONT = '"STKaiti","KaiTi","Microsoft YaHei",serif';
+const SX = 6, SY = 5.6, Mp = (x, y) => [x * SX, y * SY];      // 和另外两张同一个构图（像素坐标 ×6 / ×5.6）
+const FLOOR = 172 * SY, PIV = [1100, 860];
+const BULB = Mp(160, 48);
+const C = {
+  cream: '#FFF7EA', edge: '#A2947F', cut: '#2B2430',
+  wall: { lt: '#7E7A96', dk: '#625E7C' }, floor: { lt: '#9A7457', dk: '#7A5840' },
+  sky: '#2A3866', city: '#1E2644', frame: { lt: '#B78456', dk: '#8C5F3B' },
+  wood: { lt: '#C68E5C', dk: '#93633C' }, woodDk: '#6E4628',
+  shade: { lt: '#5F8A86', dk: '#456A68' },
+  bowl: { lt: '#F2F2F4', dk: '#C9CFDD' }, rim: '#5C77B8', rice: '#FFF8EA', chop: '#C99A62',
+  hood: { lt: '#8D96AE', dk: '#6A7290' }, pants: { lt: '#454B66', dk: '#33384F' }, hair: '#262130', skin: '#E8B48F', shoe: '#2A2633',
+  sea: '#3E8FA6', seaLt: '#8ECAD6', seaSky: '#E3F1F4', tape: '#F3E3B5',
+  plant: { lt: '#5E8C5A', dk: '#41693F' }, pot: { lt: '#C77B55', dk: '#A0603F' },
+  ribbon: '#FBF1DC', ink: '#3A2C30',
+};
+const LAMP = [255, 200, 112];
+
+const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, k) => a + (b - a) * k;
+function hashStr(s) { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+function rng(key) { let a = hashStr(String(key)); return () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+const rnd = (k) => rng(k)();
+function canvas(w, h) { const c = document.createElement('canvas'); c.width = Math.ceil(w); c.height = Math.ceil(h); return c; }
+const g2 = (c) => c.getContext('2d');
+function reset(x) { x.setTransform(1, 0, 0, 1, 0, 0); x.globalAlpha = 1; x.globalCompositeOperation = 'source-over'; x.filter = 'none'; x.shadowColor = 'rgba(0,0,0,0)'; x.shadowBlur = 0; x.shadowOffsetX = 0; x.shadowOffsetY = 0; return x; }
+const rgba = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+function poly(pts) { const p = new Path2D(); p.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) p.lineTo(pts[i][0], pts[i][1]); p.closePath(); return p; }
+function ell(cx, cy, rx, ry, rot = 0) { const p = new Path2D(); p.ellipse(cx, cy, rx, ry, rot, 0, TAU); return p; }
+function rrect(x, y, w, h, r) { const p = new Path2D(); p.roundRect(x, y, w, h, r); return p; }
+function capsule(x1, y1, x2, y2, r1, r2 = r1) { const a = Math.atan2(y2 - y1, x2 - x1), p = new Path2D(); p.arc(x1, y1, r1, a + Math.PI / 2, a - Math.PI / 2); p.arc(x2, y2, r2, a - Math.PI / 2, a + Math.PI / 2); p.closePath(); return p; }
+function twoTone(a, path, lit, dark, dx = -12, dy = -10) { a.fillStyle = dark; a.fill(path); a.save(); a.clip(path); a.translate(dx, dy); a.fillStyle = lit; a.fill(path); a.restore(); }
+function glue(a, path, fill, o = {}) { a.save(); if (o.clip) a.clip(o.clip); a.shadowColor = 'rgba(24,18,34,.36)'; a.shadowBlur = 5; a.shadowOffsetX = 2; a.shadowOffsetY = 3; a.fillStyle = fill; a.fill(path); a.restore(); a.fillStyle = fill; a.fill(path); }
+
+// ---------- 纸片 ----------
+let TEX;
+function makeTex() {
+  const s = 512, c = canvas(s, s), x = g2(c), r = rng('paper-tex');
+  for (let i = 0; i < 70; i++) { const px = r() * s, py = r() * s, rad = 30 + r() * 90, g = x.createRadialGradient(px, py, 0, px, py, rad); g.addColorStop(0, r() < .5 ? 'rgba(60,50,45,.06)' : 'rgba(255,255,255,.07)'); g.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = g; x.fillRect(px - rad, py - rad, rad * 2, rad * 2); }
+  for (let i = 0; i < 8000; i++) { x.fillStyle = r() < .55 ? `rgba(55,45,40,${.05 + r() * .08})` : `rgba(255,255,255,${.07 + r() * .1})`; x.fillRect(r() * s, r() * s, 1 + r() * 1.6, 1 + r() * 1.2); }
+  x.lineCap = 'round';
+  for (let i = 0; i < 260; i++) { const px = r() * s, py = r() * s, an = r() * TAU, l = 6 + r() * 20; x.strokeStyle = r() < .5 ? `rgba(90,75,65,${.07 + r() * .07})` : `rgba(255,255,255,${.09 + r() * .09})`; x.lineWidth = .6 + r() * .6; x.beginPath(); x.moveTo(px, py); x.quadraticCurveTo(px + Math.cos(an) * l * .5, py + Math.sin(an) * l * .5, px + Math.cos(an) * l, py + Math.sin(an) * l); x.stroke(); }
+  return c;
+}
+function texFill(x, w, h, key, alpha = 1) { const p = x.createPattern(TEX, 'repeat'); p.setTransform(new DOMMatrix([1, 0, 0, 1, Math.floor(rnd(key + 'x') * 512), Math.floor(rnd(key + 'y') * 512)])); x.save(); x.globalCompositeOperation = 'source-atop'; x.globalAlpha = alpha; x.fillStyle = p; x.fillRect(0, 0, w, h); x.restore(); }
+function grow(src, r, col) { const c = canvas(src.width, src.height), x = g2(c), n = Math.max(24, Math.round(r * 3)); for (let i = 0; i < n; i++) { const t = i / n * TAU; x.drawImage(src, Math.cos(t) * r, Math.sin(t) * r); } x.drawImage(src, 0, 0); x.globalCompositeOperation = 'source-in'; x.fillStyle = col; x.fillRect(0, 0, c.width, c.height); return c; }
+function paperSprite(key, bounds, draw, o = {}) {
+  const r = o.border ?? 10, th = o.thick ?? 3.5, pad = Math.ceil(r + th + 8);
+  const [x0, y0, x1, y1] = bounds, w = Math.ceil(x1 - x0) + 2 * pad, h = Math.ceil(y1 - y0) + 2 * pad, ox = pad - x0, oy = pad - y0;
+  const art = canvas(w, h), a = g2(art); a.translate(ox, oy); draw(a); reset(a); texFill(a, w, h, key, o.tex ?? 1);
+  const img = canvas(w, h), x = g2(img);
+  if (r > 0) { const edge = grow(art, r + 1, C.edge), rim = grow(art, r + 2.2, C.cut), card = grow(art, r, C.cream); texFill(g2(card), w, h, key + 'card', .9); x.drawImage(edge, th * .75, th); x.drawImage(rim, 0, 0); x.drawImage(card, 0, 0); }
+  x.drawImage(art, 0, 0);
+  return { img, ox, oy };
+}
+
+// ---------- 画每样东西（锚点为原点） ----------
+const S = {};
+function buildSprites() {
+  TEX = makeTex();
+  // 窗外：城市背板（窗户的灯另外自发光）
+  S.cityLights = [];
+  S.city = paperSprite('city', [0, 0, 640, 600], (a) => {
+    const sg = a.createLinearGradient(0, 0, 0, 600); sg.addColorStop(0, '#1C2650'); sg.addColorStop(1, '#4A5C96'); a.fillStyle = sg; a.fillRect(0, 0, 640, 600);
+    a.fillStyle = '#F4EED8'; a.beginPath(); a.arc(470, 110, 34, 0, TAU); a.fill(); a.fillStyle = '#2A3866'; a.beginPath(); a.arc(484, 100, 30, 0, TAU); a.fill();
+    const r = rng('city'); let x = -10;
+    while (x < 640) { const w = 50 + r() * 70, h = 220 + r() * 260; a.fillStyle = C.city; a.fillRect(x, 600 - h, w, h);
+      for (let y = 600 - h + 18; y < 590; y += 30) for (let wx = x + 10; wx < x + w - 14; wx += 22) if (r() < .25) S.cityLights.push([wx, y]);
+      x += w + 6; }
+  }, { border: 0 });
+  // 墙：一整张硬纸，挖出窗洞
+  const [wx0, wy0] = Mp(20, 34), [wx1, wy1] = Mp(105, 119);
+  S.wall = paperSprite('wall', [0, 0, W + 2 * M, FLOOR + 20], (a) => {
+    const g = a.createLinearGradient(0, 0, 0, FLOOR); g.addColorStop(0, C.wall.dk); g.addColorStop(1, C.wall.lt); a.fillStyle = g; a.fillRect(0, 0, W + 2 * M, FLOOR + 20);
+    a.fillStyle = 'rgba(40,30,50,.18)'; for (let x = 0; x < W + 2 * M; x += 64) a.fillRect(x, 0, 3, FLOOR + 20);          // 墙纸的竖纹
+    a.globalCompositeOperation = 'destination-out'; a.fillRect(wx0 + M, wy0 + M, wx1 - wx0, wy1 - wy0); a.globalCompositeOperation = 'source-over';
+  }, { border: 0, tex: 1 });
+  S.frame = paperSprite('frame', [-14, -14, wx1 - wx0 + 14, wy1 - wy0 + 50], (a) => {
+    const w = wx1 - wx0, h = wy1 - wy0, p = new Path2D(); p.rect(-14, -14, w + 28, h + 28); p.rect(0, 0, w, h);
+    a.fillStyle = C.frame.dk; a.fill(p, 'evenodd'); a.save(); a.clip(p, 'evenodd'); a.translate(-5, -5); a.fillStyle = C.frame.lt; a.fill(p, 'evenodd'); a.restore();
+    twoTone(a, rrect(w / 2 - 9, 0, 18, h, 2), C.frame.lt, C.frame.dk, -4, 0); twoTone(a, rrect(0, h / 2 - 9, w, 18, 2), C.frame.lt, C.frame.dk, 0, -4);
+    twoTone(a, rrect(-34, h + 14, w + 68, 30, 4), C.frame.lt, C.frame.dk, 0, -8);
+  }, { border: 9, thick: 4 });
+  S.postcard = paperSprite('postcard', [0, 0, 204, 126], (a) => {
+    a.fillStyle = C.seaSky; a.fillRect(0, 0, 204, 56); a.fillStyle = C.sea; a.fillRect(0, 56, 204, 70); a.fillStyle = C.seaLt; a.fillRect(0, 56, 204, 18);
+    a.strokeStyle = '#FFFFFF'; a.lineWidth = 3; a.lineCap = 'round'; for (let k = 0; k < 5; k++) { a.beginPath(); a.arc(22 + k * 40, 98 + (k % 2) * 8, 9, Math.PI * 1.1, Math.PI * 1.9); a.stroke(); }
+  }, { border: 8, thick: 2.5 });
+  S.tape = paperSprite('tape', [-18, -8, 18, 8], (a) => { a.fillStyle = 'rgba(243,227,181,.92)'; a.fillRect(-18, -8, 36, 16); }, { border: 0, tex: .6 });
+  S.floor = paperSprite('floor', [0, 0, W + 2 * M, H - FLOOR + 2 * M], (a) => {
+    for (let k = 0; k < 14; k++) { const y = k * 46; twoTone(a, rrect(0, y, W + 2 * M, 44, 2), C.floor.lt, C.floor.dk, 0, -10); a.fillStyle = 'rgba(60,40,28,.35)'; const off = (k * 377) % 520; for (let x = off; x < W + 2 * M; x += 520) a.fillRect(x, y, 3, 44); }
+  }, { border: 0 });
+  S.lamp = paperSprite('lamp', [-110, -40, 110, 30], (a) => { twoTone(a, poly([[-36, -36], [36, -36], [104, 26], [-104, 26]]), C.shade.lt, C.shade.dk, -10, -6); a.fillStyle = '#E9C680'; a.fillRect(-104, 20, 208, 6); }, { border: 9, thick: 4 });
+  const [tx0, ty0] = Mp(92, 146.5), [tx1] = Mp(230, 0);
+  S.table = paperSprite('table', [0, -6, tx1 - tx0, 300], (a) => {
+    const w = tx1 - tx0;
+    [[48, 6], [w - 72, 6]].forEach(([x]) => twoTone(a, rrect(x, 20, 26, 280, 3), C.wood.lt, C.wood.dk, -8, 0));
+    twoTone(a, rrect(0, 26, w, 36, 3), C.wood.lt, C.wood.dk, 0, -8); twoTone(a, rrect(-6, 0, w + 12, 28, 4), '#D9A16B', C.wood.lt, 0, -8);
+  }, { border: 10, thick: 5 });
+  S.stool = paperSprite('stool', [-100, 0, 100, 196], (a) => { [-82, 58].forEach((x) => twoTone(a, rrect(x, 18, 24, 178, 3), C.wood.lt, C.wood.dk, -7, 0)); twoTone(a, rrect(-70, 112, 140, 14, 3), C.wood.lt, C.wood.dk, 0, -4); twoTone(a, rrect(-100, 0, 200, 24, 4), '#D9A16B', C.wood.lt, 0, -7); }, { border: 9, thick: 4 });
+  const bowl = (full) => (a) => { if (full) { twoTone(a, ell(0, -12, 46, 22), C.rice, '#EADCBD', -6, -6); } twoTone(a, poly([[-58, -2], [58, -2], [44, 32], [18, 44], [-18, 44], [-44, 32]]), C.bowl.lt, C.bowl.dk, -14, -4); a.fillStyle = C.rim; a.fillRect(-54, 6, 108, 6); };
+  S.bowlFull = paperSprite('bowlFull', [-60, -36, 60, 46], bowl(true), { border: 7, thick: 3 });
+  S.bowlEmpty = paperSprite('bowlEmpty', [-60, -6, 60, 46], bowl(false), { border: 7, thick: 3 });
+  S.chop = paperSprite('chop', [0, -3, 160, 3], (a) => { a.fillStyle = C.chop; a.fill(capsule(0, 0, 160, 0, 3, 2)); }, { border: 4, thick: 1.5 });
+  // 他：关节纸偶
+  S.torso = paperSprite('torso', [-70, -200, 80, 10], (a) => twoTone(a, poly([[-56, 0], [72, 0], [62, -95], [34, -190], [-34, -210], [-62, -170], [-70, -66]]), C.hood.lt, C.hood.dk, -16, -8), { border: 10, thick: 4 });
+  S.head = paperSprite('head', [-56, -56, 56, 56], (a) => { twoTone(a, ell(0, 0, 52, 50, -0.3), '#4A4058', C.hair, -12, -12); twoTone(a, poly([[-54, 4], [-24, -4], [-4, 26], [-18, 52], [-44, 44]]), C.skin, '#C98B6A', -8, -4); a.fillStyle = '#C98B6A'; a.fill(ell(10, 16, 10, 14)); a.strokeStyle = C.hair; a.lineWidth = 6; a.beginPath(); a.moveTo(-52, 2); a.quadraticCurveTo(-30, -16, -6, -6); a.stroke(); }, { border: 9, thick: 3.5 });
+  S.upper = paperSprite('upper', [-30, -30, 110, 30], (a) => twoTone(a, capsule(0, 0, 86, 16, 27, 23), C.hood.lt, C.hood.dk, -6, -8), { border: 8, thick: 3 });
+  S.fore = paperSprite('fore', [-26, -26, 110, 26], (a) => { twoTone(a, capsule(0, 0, 80, -18, 23, 20), C.hood.lt, C.hood.dk, -6, -8); a.fillStyle = C.skin; a.fill(ell(98, -22, 18, 15)); }, { border: 8, thick: 3 });
+  S.leg = paperSprite('leg', [-36, -36, 130, 170], (a) => { twoTone(a, capsule(110, 0, 0, 24, 33, 28), C.pants.lt, C.pants.dk, -6, -8); twoTone(a, capsule(0, 24, 6, 140, 27, 24), C.pants.lt, C.pants.dk, -6, 0); a.fillStyle = C.shoe; a.fill(rrect(-40, 140, 66, 28, 8)); }, { border: 9, thick: 3.5 });
+  S.phone = paperSprite('phone', [-18, -30, 18, 30], (a) => { a.fillStyle = '#20232E'; a.fill(rrect(-18, -30, 36, 60, 6)); }, { border: 5, thick: 2 });
+  S.plant = paperSprite('plant', [-260, -560, 220, 40], (a) => {
+    const r = rng('leaf'); for (let i = 0; i < 9; i++) { const an = -Math.PI / 2 + (r() - 0.5) * 1.9, L = 300 + r() * 220; a.save(); a.rotate(an + Math.PI / 2); twoTone(a, ell(0, -L / 2, 46 + r() * 20, L / 2), C.plant.lt, C.plant.dk, -10, 0); a.restore(); }
+    twoTone(a, poly([[-120, -40], [120, -40], [96, 40], [-96, 40]]), C.pot.lt, C.pot.dk, -14, -6);
+  }, { border: 11, thick: 5 });
+  S.ribbon = paperSprite('ribbon', [-ribbonW() / 2, -60, ribbonW() / 2, 60], (a) => {
+    const w = ribbonW(); a.fillStyle = C.ribbon; a.fill(poly([[-w / 2, -48], [w / 2, -48], [w / 2 - 30, 0], [w / 2, 48], [-w / 2, 48], [-w / 2 + 30, 0]]));
+    a.fillStyle = C.ink; a.font = `700 70px ${FONT}`; a.textAlign = 'center'; a.textBaseline = 'middle'; a.letterSpacing = '6px'; a.fillText(LYRIC, 0, 4);
+  }, { border: 10, thick: 4 });
+}
+function ribbonW() { const x = g2(canvas(4, 4)); x.font = `700 70px ${FONT}`; x.letterSpacing = '6px'; return Math.max(400, x.measureText(LYRIC).width + 160); }
+
+// ---------- 光、层 ----------
+const BUF = {}; const buf = (n) => BUF[n] || (BUF[n] = canvas(LW, LH));
+function warmMap(x, I) {   // 吊灯的暖光：灯四周一团 + 往下的光锥 + 桌面上的光池（世界坐标）
+  x.save(); x.translate(M, M);
+  let g = x.createRadialGradient(BULB[0], BULB[1], 0, BULB[0], BULB[1], 700); g.addColorStop(0, rgba(LAMP, .95 * I)); g.addColorStop(.35, rgba(LAMP, .5 * I)); g.addColorStop(1, rgba(LAMP, 0)); x.fillStyle = g; x.fillRect(BULB[0] - 700, BULB[1] - 700, 1400, 1400);
+  const cone = buf('cone'), cx2 = reset(g2(cone)); cx2.clearRect(0, 0, LW, LH);
+  cx2.beginPath(); cx2.moveTo(BULB[0] - 100, BULB[1] + 10); cx2.lineTo(BULB[0] + 100, BULB[1] + 10); cx2.lineTo(BULB[0] + 600, FLOOR + 200); cx2.lineTo(BULB[0] - 600, FLOOR + 200); cx2.closePath();
+  g = cx2.createLinearGradient(0, BULB[1], 0, FLOOR + 200); g.addColorStop(0, rgba(LAMP, .85 * I)); g.addColorStop(1, rgba(LAMP, .25 * I)); cx2.fillStyle = g; cx2.fill();
+  x.filter = 'blur(60px)'; x.drawImage(cone, 0, 0); x.filter = 'none';
+  x.restore();
+}
+function light(L, amb, I, boost = 0) {
+  const x = reset(g2(L)), Mk = buf('mask'), mx = reset(g2(Mk)); mx.clearRect(0, 0, LW, LH); mx.drawImage(L, 0, 0);
+  const Lm = buf('lightmap'), lx = reset(g2(Lm)); const g = lx.createLinearGradient(0, 0, LW, LH); g.addColorStop(0, `rgb(${amb[0]})`); g.addColorStop(1, `rgb(${amb[1]})`); lx.fillStyle = g; lx.fillRect(0, 0, LW, LH);
+  const Wc = buf('warm'), wx = reset(g2(Wc)); wx.clearRect(0, 0, LW, LH); warmMap(wx, I); lx.drawImage(Wc, 0, 0);
+  x.globalCompositeOperation = 'multiply'; x.drawImage(Lm, 0, 0); x.globalCompositeOperation = 'destination-in'; x.drawImage(Mk, 0, 0);
+  if (boost > 0) { const B = buf('boost'), bx = reset(g2(B)); bx.fillStyle = '#000'; bx.fillRect(0, 0, LW, LH); bx.globalAlpha = boost; bx.drawImage(Wc, 0, 0); bx.globalAlpha = 1; bx.globalCompositeOperation = 'multiply'; bx.drawImage(Mk, 0, 0); bx.globalCompositeOperation = 'destination-in'; bx.drawImage(Mk, 0, 0); x.globalCompositeOperation = 'lighter'; x.drawImage(B, 0, 0); }
+  reset(x);
+}
+const SMALL = {};
+function blurDraw(Sx, src, px, alpha = 1, dx = 0, dy = 0) {
+  reset(Sx); Sx.globalAlpha = alpha;
+  if (px < .3) Sx.drawImage(src, dx, dy);
+  else if (px <= 3.5) { Sx.filter = `blur(${px.toFixed(2)}px)`; Sx.drawImage(src, dx, dy); }
+  else { const f = px > 9 ? 4 : 2, s = SMALL[f] || (SMALL[f] = canvas(LW / f, LH / f)), sx = reset(g2(s)); sx.clearRect(0, 0, s.width, s.height); sx.filter = `blur(${(px / f).toFixed(2)}px)`; sx.drawImage(src, 0, 0, s.width, s.height); Sx.imageSmoothingQuality = 'high'; Sx.drawImage(s, dx, dy, LW, LH); }
+  reset(Sx);
+}
+function stack(Sx, L, sh, blur) {
+  if (sh) { const T = buf('sil'), tx = reset(g2(T)); tx.clearRect(0, 0, LW, LH); tx.drawImage(L, 0, 0); tx.globalCompositeOperation = 'source-in'; tx.fillStyle = '#0A0B1C'; tx.fillRect(0, 0, LW, LH); blurDraw(Sx, T, sh[2], sh[3], sh[0], sh[1]); }
+  blurDraw(Sx, L, blur);
+}
+let PUSH = 0, POSE = 0;
+const camK = (d) => 1 + PUSH * d;
+function camSet(x, d) { const k = camK(d); x.setTransform(k, 0, 0, k, M + PIV[0] * (1 - k), M + PIV[1] * (1 - k)); }
+function place(x, s, wx, wy, o = {}) {
+  const id = o.id ?? 'x', j = o.jit ?? 1;
+  const jx = (rnd('jx' + id + ':' + POSE) - .5) * 1.6 * j, jy = (rnd('jy' + id + ':' + POSE) - .5) * 1.1 * j, jr = (rnd('jr' + id + ':' + POSE) - .5) * .006 * j;
+  x.save(); x.translate(wx + jx, wy + jy); x.rotate((o.rot || 0) + jr); x.scale(o.sx ?? 1, o.sy ?? 1); x.drawImage(s.img, -s.ox, -s.oy); x.restore();
+}
+
+// ---------- 一帧 ----------
+const OUT = document.getElementById('out'), OX = OUT.getContext('2d');
+function frame(t) {
+  const TQ = Math.floor(t * POSES + 1e-6) / POSES; POSE = Math.round(TQ * POSES);
+  PUSH = .03 * clamp(TQ / 8);
+  const I = 1 - rnd('flick' + POSE) * .04;
+  const Sc = buf('scene'), sx = reset(g2(Sc)); sx.fillStyle = '#10131F'; sx.fillRect(0, 0, LW, LH);
+  const L = buf('layer'); let x;
+  const begin = (d) => { x = reset(g2(L)); x.clearRect(0, 0, LW, LH); camSet(x, d); return x; };
+  const [wx0, wy0] = Mp(20, 34);
+
+  // 1 窗外的城市背板（最远、最糊；灯火自发光）
+  begin(.3); place(x, S.city, wx0 - 60, wy0 - 40, { jit: 0 });
+  light(L, ['200,210,245', '160,172,220'], 0);
+  camSet(x, .3); for (const [i, [cx, cy]] of S.cityLights.entries()) { const on = rnd('cl' + i + ':' + Math.floor(POSE / 18)) > .06; if (on) { x.fillStyle = rgba([255, 196, 120], 1); x.fillRect(wx0 - 60 + cx, wy0 - 40 + cy, 13, 16); } } reset(x);
+  stack(sx, L, null, 6);
+  // 2 墙（挖了窗洞）+ 明信片
+  begin(.6); place(x, S.wall, -M, -M, { jit: 0 });
+  const [px0, py0] = Mp(196, 54); place(x, S.postcard, px0, py0, { id: 'pc', rot: -.03, jit: .3 });
+  place(x, S.tape, px0 + 6, py0 + 2, { id: 't1', rot: -.6, jit: .2 }); place(x, S.tape, px0 + 198, py0 - 2, { id: 't2', rot: .6, jit: .2 });
+  light(L, ['132,136,178', '84,88,128'], I * .9);
+  stack(sx, L, null, 2.4);
+  // 3 窗框（比墙往前一点，往墙上投影子）
+  begin(.68); place(x, S.frame, wx0, wy0, { id: 'frame', jit: .3 });
+  light(L, ['150,150,190', '100,104,146'], I * .9);
+  stack(sx, L, [16, 14, 12, .45], 1.6);
+  // 4 地板
+  begin(1); place(x, S.floor, -M, FLOOR - 10, { jit: 0 });
+  x.save(); x.filter = 'blur(14px)'; x.fillStyle = 'rgba(20,16,30,.5)'; x.beginPath(); x.ellipse(...Mp(162, 190), 470, 46, 0, 0, TAU); x.fill(); x.beginPath(); x.ellipse(...Mp(78, 206), 110, 20, 0, 0, TAU); x.fill(); x.beginPath(); x.ellipse(...Mp(252, 207), 140, 22, 0, 0, TAU); x.fill(); x.restore();
+  light(L, ['150,140,170', '86,80,110'], I, .2);
+  stack(sx, L, null, 0);
+  // 5 吊灯（线 + 灯罩），灯泡自发光
+  begin(.92);
+  x.strokeStyle = 'rgba(30,26,36,.9)'; x.lineWidth = 3; x.beginPath(); x.moveTo(BULB[0], -M); x.lineTo(BULB[0], BULB[1] - 70); x.stroke();
+  place(x, S.lamp, BULB[0], BULB[1] - 40, { id: 'lamp', jit: .4 });
+  light(L, ['160,166,206', '110,116,160'], I * .5);
+  camSet(x, .92); const gb = x.createRadialGradient(BULB[0], BULB[1] - 8, 2, BULB[0], BULB[1] - 8, 26); gb.addColorStop(0, '#FFF3CF'); gb.addColorStop(.6, '#FFD587'); gb.addColorStop(1, '#F6B455'); x.fillStyle = gb; x.beginPath(); x.arc(BULB[0], BULB[1] - 8, 24, 0, Math.PI); x.fill(); reset(x);
+  stack(sx, L, [24, 20, 18, .35], 1);
+  // 6 家具、碗筷（焦平面）
+  begin(1);
+  place(x, S.stool, ...Mp(78, 171), { id: 'stoolL' });
+  const [tx0, ty0] = Mp(92, 146.5); place(x, S.table, tx0, ty0, { id: 'table' });
+  place(x, S.bowlFull, ...Mp(128, 140), { id: 'bowlA' }); place(x, S.chop, ...Mp(115, 135.5), { id: 'chA1', rot: -.02 }); place(x, S.chop, ...Mp(116, 137.2), { id: 'chA2', rot: -.02 });
+  place(x, S.bowlEmpty, ...Mp(190, 140), { id: 'bowlB' }); place(x, S.chop, ...Mp(174, 146.3), { id: 'chB1', rot: .01, sx: .85 }); place(x, S.chop, ...Mp(177, 145.2), { id: 'chB2', rot: -.06, sx: .85 });
+  light(L, ['168,170,206', '108,110,150'], I, .3);
+  stack(sx, L, [20, 16, 14, .42], 0);
+  // 7 他：关节纸偶（凳子、腿、身子、头、胳膊、手机）
+  begin(1);
+  const br = Math.round(Math.sin(TQ * Math.PI / 2) * 3);
+  place(x, S.stool, ...Mp(253, 176), { id: 'stoolR' });
+  place(x, S.leg, ...Mp(234, 174), { id: 'leg' });
+  place(x, S.torso, ...Mp(250, 175), { id: 'torso', rot: -.04 });
+  place(x, S.head, Mp(229, 0)[0], Mp(0, 136)[1] + br, { id: 'head', rot: -.1 });
+  place(x, S.upper, Mp(244, 0)[0], Mp(0, 145)[1] + br, { id: 'upper', rot: Math.PI - .25, sy: -1 });
+  place(x, S.fore, ...Mp(229, 150), { id: 'fore', rot: Math.PI + .12, sy: -1 });
+  place(x, S.phone, ...Mp(209.5, 142), { id: 'phone', rot: -.15 });
+  light(L, ['160,164,200', '104,108,150'], I, .25);
+  camSet(x, 1); const [phx, phy] = Mp(209.5, 142); x.fillStyle = '#CFEFFA'; x.save(); x.translate(phx, phy); x.rotate(-.15); x.fillRect(-13, -24, 26, 46); x.restore(); reset(x);   // 手机屏自发光
+  stack(sx, L, [22, 14, 14, .42], 0);
+  // 8 歌词纸条（插在焦平面前一点）
+  begin(1.05); place(x, S.ribbon, 960, 1290, { id: 'ribbon', rot: -.012 });
+  light(L, ['176,178,210', '120,122,160'], I * .7, .1);
+  stack(sx, L, [14, 12, 12, .4], .6);
+  // 9 最前景：左下角一盆糊掉的绿植
+  begin(1.4); place(x, S.plant, 120, H + 60, { id: 'plant', jit: 0, rot: .05 });
+  light(L, ['96,104,140', '70,76,110'], I * .4);
+  stack(sx, L, [30, 20, 24, .25], 14);
+  // 10 镜头：灯泡柔光、手机的冷光、暗角、定格的曝光闪
+  sx.globalCompositeOperation = 'screen';
+  let g = sx.createRadialGradient(M + BULB[0], M + BULB[1], 0, M + BULB[0], M + BULB[1], 220); g.addColorStop(0, rgba([255, 206, 128], .55 * I)); g.addColorStop(.3, rgba([250, 178, 84], .2 * I)); g.addColorStop(1, rgba([242, 165, 65], 0)); sx.fillStyle = g; sx.fillRect(0, 0, LW, LH);
+  g = sx.createRadialGradient(M + phx, M + phy, 0, M + phx, M + phy, 120); g.addColorStop(0, 'rgba(190,230,245,.35)'); g.addColorStop(1, 'rgba(190,230,245,0)'); sx.fillStyle = g; sx.fillRect(0, 0, LW, LH); reset(sx);
+  const vg = sx.createRadialGradient(M + W * .5, M + H * .45, H * .3, M + W * .5, M + H * .45, H * .95); vg.addColorStop(0, '#FFFFFF'); vg.addColorStop(1, '#8C8CA8');
+  sx.globalCompositeOperation = 'multiply'; sx.fillStyle = vg; sx.fillRect(0, 0, LW, LH); reset(sx);
+  const fl = 1 + (rnd('exp' + Math.floor(POSE / 3)) - .5) * .03;
+  reset(OX); OX.filter = `brightness(${fl.toFixed(3)})`; OX.drawImage(Sc, -M, -M); reset(OX);
+}
+window.sceneReady = (async () => { try { await document.fonts.load(`700 70px ${FONT}`, LYRIC); } catch (e) {} buildSprites(); return true; })();
+window.renderAt = async (t) => { frame(t); return OUT.toDataURL('image/png'); };
+</script></body></html>
