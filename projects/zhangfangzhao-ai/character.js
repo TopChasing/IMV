@@ -15,7 +15,7 @@
                   | 'sit' | 'sitHunch' | 'sitHold' | 'sitSlump' | 'shrug'（只有正面）
                   （侧面全支持；正面/背面支持 idle、walk、jump、slump，正面另有 shrug）
      o.who        'him' | 'her' | 'cam'（海边的路人摄影师）
-     动作另有 'shoot'（端相机，侧面）、'wipe'（抬手到对方脸颊，侧面）
+     动作另有 'kneel'（双膝跪地，侧面）、'shoot'（端相机，侧面）、'wipe'（抬手到对方脸颊，侧面）
      o.u          动作进行到哪 0→1      o.t  全片时间（呼吸、眨眼、走路）
      o.arms, o.armsU  手臂另用一个动作的姿势（比如 action:'walk' + arms:'holdHigh' 边走边撑伞）
      o.seat       坐高（逻辑像素，默认 0.33 × size）
@@ -67,6 +67,7 @@
     if (act === 'shrug' && !side) return mix(base, over(base, { as: -0.95, ae: -1.55, bs: 0.95, be: 1.55, tilt: 0.12 }), smooth(u));   // 正面摊手：两只小臂朝上
     if (act === 'slump') return mix(base, over(base, side ? { lean: 0.34, tilt: 0.5, bodyY: 22, as: 0.14, ae: 0.02, bs: 0.04, be: -0.04, plant: true, sy: 0.97 } : { tilt: 0.5, bodyY: 20, as: -0.06, bs: 0.06, ae: 0.02, be: -0.02, plant: true, sy: 0.96 }), smooth(u));
     if (!side) return base;
+    if (act === 'kneel') return mix(base, over(base, { lean: 0.3, tilt: 0.55, bodyY: 116, ah: -0.15, ak: 1.6, bh: -0.05, bk: 1.5, as: 0.25, ae: 0, bs: 0.15, be: 0, sy: 0.98 }), smooth(u));   // 双膝跪地，头垂下，手垂着
     if (act === 'shoot') {   // 端相机：u=0 相机在胸前，u=1 举到眼前
       const hold = over(base, { as: -0.38, ae: -1.55, bs: -0.28, be: -1.5 });
       return mix(hold, over(base, { as: -1.6, ae: -2.18, bs: -1.5, be: -2.25, lean: 0.06, tilt: 0.04 }), smooth(u));

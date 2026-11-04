@@ -120,7 +120,7 @@ function drawClock(G, cam, tf, L) {
   G.px(cx, cy, 0);
 }
 // ---- 墙上的拍立得：海边自拍那一张（第 8 镜卡嚓那一刻的画面，缩小 10 倍） ----
-const CLICK = 107.74;                                       // 卡嚓：快门声的时间（第 8 镜小节第一拍）
+const CLICK = 108.74;                                       // 卡嚓：快门声的时间（第 8 镜小节第一拍）
 const PHOTO_IN = [10, 10, 300, 200];                        // 定格画面里拍立得白框以内的区域
 const WP = [197, 53];                                       // 墙上拍立得左上角（外框 32×24：内 30×20，上左右 1、下 3）
 let PHOTO = null;
@@ -396,6 +396,13 @@ function drawPhotographer(G, tf, light) {   // 路人摄影师站在右边沙丘
   G.rect(x0 - 3, y0 + 1, 3, bh - 2, 0); G.px(x0 - 2, y0 + 2, 6);                                                 // 镜头朝左
   if (tf >= CLICK - 1 / 12 && tf < CLICK) G.rect(x0 + bw - 3, y0 - 2, 2, 1, 8);                                   // 按下快门
 }
+function seaFrame(G, s) {   // 海边一帧：卡嚓闪光 → 白光退 → 定格成拍立得
+  const tf = q(s);
+  if (tf >= CLICK && tf < CLICK + 1 / 12) G.fill(8);
+  else if (tf >= CLICK + 1 / 12 && tf < CLICK + 2 / 12) { drawSea(G, CLICK, { photo: true }); for (let y = 0; y < LH; y++) for (let x = 0; x < LW; x++) if (PIX.bt(x, y) < 0.6) G.px(x, y, 8); }
+  else if (tf >= CLICK + 2 / 12 && tf < CLICK + 0.95) { drawSea(G, CLICK, { photo: true }); drawPhotoFrame(G); }
+  else drawSea(G, s);
+}
 function drawPhotoFrame(G) {   // 定格时的拍立得白框：上左右 10，下 30（和墙上那张同比例）
   const [x0, y0, w, h] = PHOTO_IN;
   for (let y = 0; y < LH; y++) for (let x = 0; x < LW; x++) { if (x >= x0 && x < x0 + w && y >= y0 && y < y0 + h) continue; G.px(x, y, G.dith([7, 29, 8], 1.4 - Math.abs(y - 120) / 260, x, y)); }
@@ -466,7 +473,7 @@ function cold(Gx) { for (let i = 0; i < Gx.B.length; i++) Gx.B[i] = COLD[Gx.B[i]
 // ============================== 镜头 ==============================
 
 // ---- 叹气：歌里的气声"唉"。只做两处：第 12 句 69.45（看手机时）、第 18 句 100.47（坐下那一下） ----
-const SIGHS = [69.45, 100.47];
+const SIGHS = [68.70, 100.47];
 const sighAt = (tf) => SIGHS.find((t0) => tf >= t0 - 0.35 && tf < t0 + 1.5);
 function sighPose(tf) {   // 返回对 sitHunch u 的修正：吸气时直起来一点，呼气时塌下去
   const t0 = sighAt(tf); if (t0 === undefined) return 0;
@@ -533,12 +540,12 @@ function shotStreet(G, s) {   // 第 3–6 镜：夜街，一镜到底往右卷
   if (tf >= 84.9 && tf < 85.4) Object.assign(him, { action: 'pat', u: smooth(seg(tf, 84.9, 84.98)), expression: 'shy' });
   if (shrug) Object.assign(him, { facing: 'front', action: 'shrug', u: smooth(seg(tf, shrug[0], shrug[0] + 0.25)), expression: 'happy' });
   if (umbrella && !shrug) Object.assign(him, { arms: 'holdHigh', armsU: tf >= 97.4 ? 1 - smooth(seg(tf, 97.4, 98.4)) : 1 });
-  if (umbrella) Object.assign(him, { hold: CHAR.PROPS.umbrella, umbrellaW: 30, umbrellaH: 26 }); if (umbrella && tf < 95.32) him.umbrellaDX = Math.round((himX + herX) / 2 + (herX > himX ? 3 : -3) - CHAR.handAt(him).x);   // 伞面罩住两个人，略偏向她那边
-  if (tf >= 95.32) Object.assign(him, { action: tf >= 98.45 ? 'slump' : 'idle', u: smooth(seg(tf, 98.45, 98.9)), expression: 'sad', facing: 'right' });
+  if (umbrella) Object.assign(him, { hold: CHAR.PROPS.umbrella, umbrellaW: 34, umbrellaH: 26 });   // 伞杆竖直在手里，伞面够大，罩住两个人
+  if (tf >= 95.32) Object.assign(him, { action: tf >= 98.45 ? 'kneel' : 'idle', u: smooth(seg(tf, 98.45, 98.9)), expression: 'sad', facing: 'right' });
   const her = { who: 'her', x: herX, y: herY, size: 50, facing: 'right', t: tf, light, action: herWalk ? 'walk' : 'idle', expression: tf < 95.32 ? 'happy' : 'sad' };
   const drawOrder = himY < herY ? [him, her] : [her, him];
   for (const o of drawOrder) CHAR.draw(G, o);
-  if (tf >= 98.45) { const x = himX + 8, y = himY; G.shape([x - 2, y - 10, x + 52, y + 2], (xx, yy) => yy > y - 9 && yy < y && Math.abs(xx - x - 24) < 26 - (y - yy) * 2.4, (xx, yy) => G.dith([2, 3], 1, xx, yy), 0); G.line(x - 4, y - 2, x + 2, y - 2, 0); }   // 掉在地上的伞
+  if (tf >= 98.45) { const x = himX + 20, y = himY; G.shape([x - 2, y - 10, x + 52, y + 2], (xx, yy) => yy > y - 9 && yy < y && Math.abs(xx - x - 24) < 26 - (y - yy) * 2.4, (xx, yy) => G.dith([2, 3], 1, xx, yy), 0); G.line(x - 4, y - 2, x + 2, y - 2, 0); }   // 掉在地上的伞
   drawCar(G, tf, S.cam); drawSplash(G, tf, himX, himY - 18);
   if (rain > 0) drawRain(G, s, rain, tf);
 }
@@ -623,15 +630,9 @@ function frame(t) {
     if (tf < 103.61) shotRoom7(G, s);
     else { shotRoom7(GA, s); GB.fill(0); const z = tf < 104.12 ? 1 : [2, 4, 7][Math.min(2, Math.floor((tf - 104.12) * 6))]; zoomCopy(G, GA, 160 + pan * (z === 1 ? 1 : 0) + (z > 1 ? 53 : 0), z > 1 ? 65 : 120, z); }
   }
-  else if (inS(s, 'sea')) {
-    const tf = q(s);
-    if (tf >= CLICK && tf < CLICK + 1 / 12) G.fill(8);                                                       // 闪光：一整张白
-    else if (tf >= CLICK + 1 / 12 && tf < CLICK + 2 / 12) { drawSea(G, CLICK, { photo: true }); for (let y = 0; y < LH; y++) for (let x = 0; x < LW; x++) if (PIX.bt(x, y) < 0.6) G.px(x, y, 8); }   // 白光退下去
-    else if (tf >= CLICK + 2 / 12 && tf < CLICK + 0.95) { drawSea(G, CLICK, { photo: true }); drawPhotoFrame(G); }   // 定格成一张拍立得
-    else drawSea(G, s);
-  }
+  else if (inS(s, 'sea')) seaFrame(G, s);
   else if (inS(s, 'sweep')) {   // 大浪从左往右扫过，浪后面露出近景
-    drawSea(GA, s); drawClose(GB, 109.81); const front = Math.round(lerp(-30, LW + 30, smooth(seg(q(s), 109.30, 109.81))));
+    seaFrame(GA, s); drawClose(GB, 109.81);   // 浪从定格的拍立得上扫过去 const front = Math.round(lerp(-30, LW + 30, smooth(seg(q(s), 109.30, 109.81))));
     for (let y = 0; y < LH; y++) for (let x = 0; x < LW; x++) { const d = front - x; G.B[y * LW + x] = d > 24 ? GB.B[y * LW + x] : d > 0 ? G.dith([27, 6, 8], 0.6 + (24 - d) / 10 + Math.sin(y * 0.3) * 0.4, x, y) : GA.B[y * LW + x]; }
   }
   else if (inS(s, 'close')) drawClose(G, s);
