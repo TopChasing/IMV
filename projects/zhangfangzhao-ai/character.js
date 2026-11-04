@@ -127,19 +127,19 @@
     const skinC = (x, y) => G.dith(RAMP.skin, 0.55 + L(x, y) * 0.9 - (toU(x) > 0.3 * R && view !== 'side' ? 0.3 : 0), x, y);
     const hairC = who === 'her' ? (x, y) => G.dith(S.hair, 0.3 + L(x, y) * 1.3 + toV(y) / (R * 3.2), x, y)   // 发根深、发尾亮
       : (x, y) => G.dith(S.hair, 0.3 + L(x, y) * 0.9 - toV(y) / (R * 3), x, y);
-    // 她：脑后的长发（在脸后面）
+    // 她：披散长直发。头发和脸画成同一个剪影（只有外面一圈轮廓，看不到圆脑袋），头发从头顶垂直落到肩上
+    let herHair = null;
     if (who === 'her') {
-      // 披散的长直发：中分，从头顶直直垂到胸口（约 2.4R），两侧贴着脸垂下、盖住耳朵；不扎、不往外翘，发尾只有很浅的参差
-      const jag = (u) => (Math.floor((u + 3 * R) / Math.max(2, R * 0.4)) % 2 ? 0.06 * R : 0);
-      const END = 2.4 * R;
-      const back = view === 'side' ? (u, v) => u > -0.25 * R && u < 1.08 * R && (v < 0.45 * R || u > -0.02 * R) && v < END - Math.max(0, u - 0.75 * R) * 0.5 - jag(u)   // 一整片帘子，后沿笔直
-        : view === 'back' ? (u, v) => Math.abs(u) < 1.1 * R - Math.max(0, v - 2.0 * R) * 0.4 && v < END + 0.1 * R - (Math.abs(u) / R) ** 2 * 0.1 * R - jag(u)
-        : (u, v) => Math.abs(u) < 1.12 * R - Math.max(0, v - 2.0 * R) * 0.35 && v < END - jag(u) && (v < 0.85 * R || Math.abs(u) > 0.5 * R);   // 两边各一片直直垂到胸口，中间让出脖子
-      const round = (u, v) => v > 0 || (u / (1.15 * R)) ** 2 + (v / (1.02 * R)) ** 2 <= 1;   // 头顶是圆的，不出方角
-      G.shape([cx - 1.3 * R, cy - R, cx + 1.3 * R, cy + 3 * R], (x, y) => { const u = toU(x), v = toV(y); return round(u, v) && back(u, v); }, hairC, 0);
+      const END = 1.85 * R, jag = (u) => (Math.floor((u + 3 * R) / Math.max(2, R * 0.4)) % 2 ? 0.05 * R : 0);
+      const cap = (u, v) => v <= 0.2 * R && (u / (1.06 * R)) ** 2 + (v / (1.06 * R)) ** 2 <= 1;                     // 头顶的头发比脑袋大一圈
+      herHair = view === 'side'
+        ? (u, v) => cap(u, v) || (u > -0.42 * R && u < 0.98 * R && v > -0.2 * R && v < END - jag(u))                 // 侧面：前沿、后沿都是竖直的，一整片垂到肩上，只露出前面一条脸
+        : view === 'back'
+          ? (u, v) => cap(u, v) || (Math.abs(u) < 1.04 * R && v > -0.2 * R && v < END + 0.05 * R - jag(u))
+          : (u, v) => cap(u, v) || (Math.abs(u) > 0.7 * R && Math.abs(u) < 1.06 * R && v > -0.4 * R && v < END - jag(u));   // 正面：两片贴着脸颊竖直垂到肩上
     }
     // 耳朵（正面、背面两边各一个）
-    if (view !== 'side') [-1, 1].forEach((s) => G.ellipse(cx + s * R * 0.98, cy + R * 0.1, Math.max(0.8, R * 0.16), Math.max(1, R * 0.24), skinC, 0));
+    if (view !== 'side' && who !== 'her') [-1, 1].forEach((s) => G.ellipse(cx + s * R * 0.98, cy + R * 0.1, Math.max(0.8, R * 0.16), Math.max(1, R * 0.24), skinC, 0));
     // 脸 + 头发（一个形状里分区上色，外面一圈轮廓）
     const face = view === 'side' ? (u, v) => (u / (0.95 * R)) ** 2 + (v / R) ** 2 <= 1 || (u < -0.8 * R && u > -1.08 * R && v > -0.05 * R && v < 0.3 * R && u > -0.8 * R - (v + 0.05 * R) * 0.9)
       : (u, v) => (u / R) ** 2 + (v / (1.02 * R)) ** 2 <= 1;
@@ -152,15 +152,17 @@
         : (u, v) => v < -0.06 * R - zig(u) || (Math.abs(u) > 0.8 * R && v < 0.2 * R);
     }
     else hair = view === 'side'
-      ? (u, v) => v < -0.36 * R || u > -0.08 * R && v < 0.95 * R || (u < -0.5 * R && v < -0.18 * R)
-      : (u, v) => v < -0.62 * R + Math.abs(u) * 0.6 || Math.abs(u) > 0.74 * R;   // 中分，没有刘海，两边的头发贴着脸颊
+      ? (u, v) => v < -0.34 * R || u > -0.42 * R                                                                       // 侧面：只露出眼睛到下巴的前面一条
+      : (u, v) => v < -0.6 * R + Math.abs(u) * 0.55 || Math.abs(u) > 0.7 * R;   // 中分，没有刘海，两边的头发贴着脸颊
     // 他的蓬发：比头大一圈、边上一簇一簇翘起来；先垫在脸后面，画完脸再把脸上沿的轮廓线盖掉
     const blob = (u, v) => { const yy = v + 0.16 * R, a = Math.atan2(yy, u), b = 1 + 0.09 * Math.sin(a * 9 + 0.7) + 0.05 * Math.sin(a * 14);
       const lim = view === 'side' ? (v < -0.05 * R || (u > 0 && v < 0.45 * R)) : v < 0.12 * R;
       return lim && (u / (1.1 * R)) ** 2 + (yy / (1.0 * R)) ** 2 <= b * b; };
     const hb = [cx - 1.4 * R, cy - 1.4 * R, cx + 1.4 * R, cy + 1.2 * R];
     if (who === 'him') G.shape(hb, (x, y) => blob(toU(x), toV(y)), hairC, 0);
-    G.shape([cx - 1.2 * R, cy - 1.1 * R, cx + 1.2 * R, cy + 1.1 * R], (x, y) => face(toU(x), toV(y)), (x, y) => (hair(toU(x), toV(y)) ? hairC(x, y) : skinC(x, y)), 0);
+    if (herHair) G.shape([cx - 1.3 * R, cy - 1.2 * R, cx + 1.3 * R, cy + 2.0 * R], (x, y) => { const u = toU(x), v = toV(y); return face(u, v) || herHair(u, v); },
+      (x, y) => { const u = toU(x), v = toV(y); return face(u, v) && !hair(u, v) ? skinC(x, y) : hairC(x, y); }, 0);
+    else G.shape([cx - 1.2 * R, cy - 1.1 * R, cx + 1.2 * R, cy + 1.1 * R], (x, y) => face(toU(x), toV(y)), (x, y) => (hair(toU(x), toV(y)) ? hairC(x, y) : skinC(x, y)), 0);
     if (who === 'him') G.shape(hb, (x, y) => { const u = toU(x), v = toV(y); return blob(u, v) && (hair(u, v) || !face(u, v)); }, hairC, null);
     if (who === 'cam') G.shape([cx - 1.6 * R, cy - 1.3 * R, cx + 1.6 * R, cy], (x, y) => { const u = toU(x), v = toV(y);
       return (v < -0.26 * R && (u / (1.06 * R)) ** 2 + ((v + 0.05 * R) / (1.08 * R)) ** 2 <= 1) || (view === 'side' && v >= -0.44 * R && v < -0.24 * R && u < -0.3 * R && u > -1.55 * R) || (view === 'front' && v >= -0.42 * R && v < -0.24 * R && Math.abs(u) < 1.2 * R); },
