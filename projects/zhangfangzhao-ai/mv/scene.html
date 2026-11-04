@@ -632,7 +632,7 @@ function frame(t) {
   }
   else if (inS(s, 'sea')) seaFrame(G, s);
   else if (inS(s, 'sweep')) {   // 大浪从左往右扫过，浪后面露出近景
-    seaFrame(GA, s); drawClose(GB, 109.81);   // 浪从定格的拍立得上扫过去 const front = Math.round(lerp(-30, LW + 30, smooth(seg(q(s), 109.30, 109.81))));
+    seaFrame(GA, s); drawClose(GB, 109.81); /* 浪从定格的拍立得上扫过去 */ const front = Math.round(lerp(-30, LW + 30, smooth(seg(q(s), 109.30, 109.81))));
     for (let y = 0; y < LH; y++) for (let x = 0; x < LW; x++) { const d = front - x; G.B[y * LW + x] = d > 24 ? GB.B[y * LW + x] : d > 0 ? G.dith([27, 6, 8], 0.6 + (24 - d) / 10 + Math.sin(y * 0.3) * 0.4, x, y) : GA.B[y * LW + x]; }
   }
   else if (inS(s, 'close')) drawClose(G, s);
