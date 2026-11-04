@@ -129,12 +129,12 @@
       : (x, y) => G.dith(S.hair, 0.3 + L(x, y) * 0.9 - toV(y) / (R * 3), x, y);
     // 她：脑后的长发（在脸后面）
     if (who === 'her') {
-      // 中长发、自然垂下：发尾刚好落到肩上（约 1.55R），两侧顺着肩膀微微往外散，发尾只有很浅的参差
-      const jag = (u) => (Math.floor((u + 3 * R) / Math.max(2, R * 0.45)) % 2 ? 0.07 * R : 0);
-      const END = 1.55 * R;
-      const back = view === 'side' ? (u, v) => u > -0.2 * R && u < 1.08 * R + Math.max(0, v) * 0.06 && v < END + 0.1 * R - Math.max(0, u - 0.8 * R) * 0.4 - jag(u)
-        : view === 'back' ? (u, v) => Math.abs(u) < 1.1 * R - Math.max(0, v - 1.3 * R) * 0.5 && v < END + 0.15 * R - (Math.abs(u) / R) ** 2 * 0.12 * R - jag(u)
-        : (u, v) => Math.abs(u) < 1.1 * R - Math.max(0, v - 1.2 * R) * 0.5 && v < END - jag(u) && (v < 0.85 * R || Math.abs(u) > 0.55 * R);   // 两侧垂直，发尾往里收一点；下巴以下让出脖子
+      // 披散的长直发：中分，从头顶直直垂到胸口（约 2.4R），两侧贴着脸垂下、盖住耳朵；不扎、不往外翘，发尾只有很浅的参差
+      const jag = (u) => (Math.floor((u + 3 * R) / Math.max(2, R * 0.4)) % 2 ? 0.06 * R : 0);
+      const END = 2.4 * R;
+      const back = view === 'side' ? (u, v) => u > -0.25 * R && u < 1.08 * R && (v < 0.45 * R || u > -0.02 * R) && v < END - Math.max(0, u - 0.75 * R) * 0.5 - jag(u)   // 一整片帘子，后沿笔直
+        : view === 'back' ? (u, v) => Math.abs(u) < 1.1 * R - Math.max(0, v - 2.0 * R) * 0.4 && v < END + 0.1 * R - (Math.abs(u) / R) ** 2 * 0.1 * R - jag(u)
+        : (u, v) => Math.abs(u) < 1.12 * R - Math.max(0, v - 2.0 * R) * 0.35 && v < END - jag(u) && (v < 0.85 * R || Math.abs(u) > 0.5 * R);   // 两边各一片直直垂到胸口，中间让出脖子
       const round = (u, v) => v > 0 || (u / (1.15 * R)) ** 2 + (v / (1.02 * R)) ** 2 <= 1;   // 头顶是圆的，不出方角
       G.shape([cx - 1.3 * R, cy - R, cx + 1.3 * R, cy + 3 * R], (x, y) => { const u = toU(x), v = toV(y); return round(u, v) && back(u, v); }, hairC, 0);
     }
@@ -153,7 +153,7 @@
     }
     else hair = view === 'side'
       ? (u, v) => v < -0.36 * R || u > -0.08 * R && v < 0.95 * R || (u < -0.5 * R && v < -0.18 * R)
-      : (u, v) => v < -0.34 * R - Math.abs(u) * 0.1 + (Math.abs(u) < 0.06 * R ? -0.16 * R : 0) || Math.abs(u) > 0.78 * R - Math.max(0, -v) * 0.1;
+      : (u, v) => v < -0.62 * R + Math.abs(u) * 0.6 || Math.abs(u) > 0.74 * R;   // 中分，没有刘海，两边的头发贴着脸颊
     // 他的蓬发：比头大一圈、边上一簇一簇翘起来；先垫在脸后面，画完脸再把脸上沿的轮廓线盖掉
     const blob = (u, v) => { const yy = v + 0.16 * R, a = Math.atan2(yy, u), b = 1 + 0.09 * Math.sin(a * 9 + 0.7) + 0.05 * Math.sin(a * 14);
       const lim = view === 'side' ? (v < -0.05 * R || (u > 0 && v < 0.45 * R)) : v < 0.12 * R;
@@ -165,7 +165,8 @@
     if (who === 'cam') G.shape([cx - 1.6 * R, cy - 1.3 * R, cx + 1.6 * R, cy], (x, y) => { const u = toU(x), v = toV(y);
       return (v < -0.26 * R && (u / (1.06 * R)) ** 2 + ((v + 0.05 * R) / (1.08 * R)) ** 2 <= 1) || (view === 'side' && v >= -0.44 * R && v < -0.24 * R && u < -0.3 * R && u > -1.55 * R) || (view === 'front' && v >= -0.42 * R && v < -0.24 * R && Math.abs(u) < 1.2 * R); },
       (x, y) => G.dith([30, 31], 0.5 + L(x, y), x, y), 0);   // 红色棒球帽，帽檐朝前
-    if (view === 'side') G.ellipse(cx + flip * R * 0.16, cy + R * 0.12, Math.max(0.8, R * 0.13), Math.max(1, R * 0.2), (x, y) => G.dith(RAMP.skin, 0.3 + L(x, y) * 0.6, x, y), 0);   // 侧面的耳朵
+    if (who === 'her' && view === 'front' && R >= 6) G.line(cx, cy - Math.round(R * 1.0), cx, cy - Math.round(R * 0.6), S.hair[0]);   // 中分的分线
+    if (view === 'side' && who !== 'her') G.ellipse(cx + flip * R * 0.16, cy + R * 0.12, Math.max(0.8, R * 0.13), Math.max(1, R * 0.2), (x, y) => G.dith(RAMP.skin, 0.3 + L(x, y) * 0.6, x, y), 0);   // 侧面的耳朵
     if (view === 'back') return;
     // 五官
     const ex = view === 'side' ? [-0.5 * R] : [-0.36 * R, 0.36 * R], ey = cy + Math.round(0.12 * R);

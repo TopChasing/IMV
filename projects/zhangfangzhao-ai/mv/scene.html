@@ -619,18 +619,6 @@ function shotDoor(G, s) {   // 平移到门口 → 第 10 镜（回忆：她走�
     const tmp = PIX.create(LW, LH); tmp.B.fill(255);
     const glance = tf >= 114.3 && tf < 114.95;   // 走之前回头看他一眼
     CHAR.draw(tmp, { who: 'her', x, y, size, facing: glance ? 'left' : 'back', action: u > 0 ? 'walk' : 'idle', t: tf, light, expression: 'sad' });
-    { // 链条水桶包：斜挎。链条从右肩斜跨过后背到左胯，包贴在左胯外侧
-      const sd = glance ? -1 : 1, bw = Math.max(7, Math.round(size * 0.15)), bh = Math.max(7, Math.round(size * 0.14));
-      const shx = Math.round(x + sd * size * 0.11), shy = Math.round(y - size * 0.79);                 // 肩
-      const hpx = Math.round(x - sd * size * 0.16), hpy = Math.round(y - size * 0.47);                 // 对侧胯
-      const bx = hpx - (sd > 0 ? bw - 2 : 1), by = hpy;
-      const gold = (xx, yy) => ((xx + yy) % 2 ? 23 : 25);
-      tmp.line(shx, shy, hpx, hpy, gold); tmp.line(shx, shy - 1, shx + sd * 2, shy + 1, gold);           // 斜跨的金色链条，搭过肩头
-      tmp.shape([bx - 1, by - 1, bx + bw + 1, by + bh + 1], (xx, yy) => { const v = (yy - by) / bh; return v >= 0 && v <= 1 && Math.abs(xx - bx - bw / 2) <= bw / 2 - (v < 0.2 ? (0.2 - v) * bw * 0.6 : 0) + (v > 0.85 ? -(v - 0.85) * 6 : 0); },
-        (xx, yy) => (((xx - bx) + (yy - by)) % 4 === 0 || ((xx - bx) - (yy - by) + 64) % 4 === 0 ? 1 : G.dith([0, 1, 2], 1 + light(xx, yy) * 0.8, xx, yy)), 0);   // 黑色菱格皮，上口收紧
-      tmp.rect(bx + Math.floor(bw / 2) - 1, by + 1, 2, 1, 24);                                          // 金色扣
-      for (let k = 0; k < Math.round(bh * 0.45); k++) tmp.px(bx + Math.floor(bw / 2) + (k % 3 === 2 ? 1 : 0), by + 2 + k, gold(k, 0));
-    }
     const [d0, dy0, d1] = [DOOR[0] - cam, DOOR[1], DOOR[2] - cam], leafW = Math.round((d1 - d0) * (1 - st.door));
     for (let i = 0; i < LW * LH; i++) { if (tmp.B[i] === 255) continue; const px = i % LW, py = (i / LW) | 0; if (u > 0.6 && (px < d0 || px >= d1 - leafW || py < dy0)) continue; G.B[i] = tmp.B[i]; }
   }
