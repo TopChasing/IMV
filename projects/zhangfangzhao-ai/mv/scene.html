@@ -1,11 +1,11 @@
 <!doctype html>
 <!--
-  《唉》试跑段（第 12–22 句）· 像素风 · 320×240 逻辑画布 ×6 = 1920×1440
+  《唉》全曲（开头、结尾在 bookends.js；中段第 12–22 句在本文件）· 像素风 · 320×240 逻辑画布 ×6 = 1920×1440
   window.renderAt(t)：t = 视频时间（0 起），歌曲时间 s = T0 + t。画面只由 t 决定。
   分镜见 ../storyboard.md；画法见 ../song.md「画风」；角色 ../character.js；共用画法 ../lib/pixel.js。
   歌词在画面里的 RPG 对话框，打字机出字；左上角血条：现在 1 颗心，回忆 3 颗。
   出草图：node render_frames.mjs --page mv/scene.html --times … --width 1920 --height 1440 --out sketches
-  出整片：node render_frames.mjs --page mv/scene.html --fps 24 --duration 51.83 --width 1920 --height 1440 --out frames --format png --encode render.mp4（像素画必须 PNG：页面返回 PNG，且 JPG 会把像素边压糊）
+  出整片：node render_frames.mjs --page mv/scene.html --fps 24 --duration 158 --width 1920 --height 1440 --out frames --format png --encode render.mp4（像素画必须 PNG：页面返回 PNG，且 JPG 会把像素边压糊）
 -->
 <html lang="zh-CN"><head><meta charset="UTF-8" />
 <script src="../lib/pixel.js"></script>
@@ -15,7 +15,7 @@
 </head><body><canvas id="out"></canvas>
 <script>
 'use strict';
-const T0 = 66.87, DURATION = 51.83;
+const T0 = 0, DURATION = 158;   // 全曲：视频时间 = 歌曲时间
 const LW = 320, LH = 240, SCALE = 6;
 const { C, RAMP, clamp, lerp, smooth, rnd } = PIX;
 const out = document.getElementById('out'); out.width = LW * SCALE; out.height = LH * SCALE;
@@ -32,7 +32,7 @@ const HALF = [66.87, 68.43, 70.50, 72.56, 74.63, 76.72, 78.76, 80.85, 82.92];   
 const SHOT = {
   room1: [66.87, 82.42], push1: [82.42, 82.92], street: [82.92, 98.97], push2: [98.97, 99.47],
   room7: [99.47, 104.12], zoomIn: [104.12, 104.63], sea: [104.63, 110.30], sweep: [110.30, 110.81],
-  close: [110.81, 113.10], zoomOut: [113.10, 113.43], door: [113.43, 117.05], last: [117.05, 120],
+  close: [110.81, 113.10], zoomOut: [113.10, 113.43], door: [113.43, 117.05], last: [117.05, 117.75],
 };
 const inS = (s, k) => s >= SHOT[k][0] && s < SHOT[k][1];
 const SNARE = BAR.flatMap((b) => [b + 1.02, b + 3.06]);                           // 军鼓：慢拍 2、4
@@ -72,7 +72,7 @@ function drawRoom(G, cam, st) {
   if (door > 0.05) for (let y = FLOOR; y < LH; y++) { const sp = (y - FLOOR) * 0.5 * door; for (let x = Math.round(d0 - sp); x < d0 + (d1 - d0 - leafW) + sp; x++) if (PIX.bt(x + cam, y) < 0.55 * door) G.px(x, y, (y - FLOOR) % 9 === 0 ? 15 : 16); }
   // 窗（外面城市 + 雨）
   const WX0 = 26, WY0 = 44, WX1 = 88, WY1 = 100, X0 = WX0 - cam, Y0 = WY0, X1 = WX1 - cam, Y1 = WY1;
-  for (let y = Y0; y <= Y1; y++) for (let x = X0; x <= X1; x++) G.px(x, y, G.dith(RAMP.sky, 0.3 + ((y - Y0) / (Y1 - Y0)) * 2.4, x, y));
+  for (let y = Y0; y <= Y1; y++) for (let x = X0; x <= X1; x++) G.px(x, y, (st.dawn > 0.55 && y > Y1 - 8 && PIX.bt(x, y) < (st.dawn - 0.55) * 2 ? 23 : G.dith([1, 2, 3, 4, 5, 6, 7], 0.3 + ((y - Y0) / (Y1 - Y0)) * 2.4 + (st.dawn || 0) * 3.4, x, y)));
   [[20, 78, 14], [33, 66, 12], [44, 86, 16], [59, 58, 11], [69, 74, 13], [81, 90, 10], [90, 70, 15]].map(([bx, by, bw]) => [Math.round(WX0 + (bx - 20) * 62 / 84), Math.round(WY0 + (by - 34) * 56 / 84), Math.max(6, Math.round(bw * 62 / 84))]).forEach(([bx, by, bw], i) => {
     for (let y = by; y <= Y1; y++) for (let x = bx; x < Math.min(bx + bw, WX1 + 1); x++) G.px(x - cam, y, 1);
     for (let y = by + 3; y < Y1 - 2; y += 4) for (let x = bx + 2; x < Math.min(bx + bw - 1, WX1); x += 3) if (rnd('w' + i + ':' + x + ':' + y) < 0.22 && !(rnd('wb' + i + x + y + ':' + Math.floor(st.tf * 0.5)) < 0.04)) G.px(x - cam, y, 25);
@@ -97,7 +97,8 @@ const MEM = [                                                // [开始转, 转�
   [113.44, 113.94, 23 * 3600 + 8 * 60, 116.01, 116.51],     // 第 10 镜：她出门那晚，23:08
 ];
 function clockSec(tf) {                                      // 钟上显示的秒数（可以是负的 = 前一天）
-  const now = NOW0 + (tf - T0);
+  if (tf >= 141.34 && window.BOOK) return BOOK.clock(tf);   // 结尾一夜过去，钟越转越快
+  const now = NOW0 + (tf - 66.87);
   for (const [a0, a1, mem, b0, b1] of MEM) {
     const memT = mem - 86400 + (tf - a1);                    // 回忆的时刻放到"前一天"，这样进回忆就是往回拨
     if (tf >= a0 && tf < a1) return lerp(now, memT, seg(q(tf), a0, a1));
@@ -279,6 +280,7 @@ function phoneUI(G, tf, hx, hy) {
 
 // ============================== 街（横版卷轴） ==============================
 const LAMPS_ST = [140, 300, 460, 620, 780];
+const ST0 = { lamps: LAMPS_ST, off: () => false, closed: false }; let ST = ST0;   // 开头那条街：ST.closed 店铺拉着卷帘门，ST.off(lx) 这盏路灯灭了
 const SHOP = [230, 300], SHOP2 = [560, 620], ZEBRA = [420, 470];
 const V = 40;   // 走路速度 px/s
 const GAP = 17; // 两个人前后错开（伞下挨着走）
@@ -298,8 +300,8 @@ function streetState(s) {
 function streetLight(cam, warm) {
   return (x, y) => {
     const wx = x + cam; let v = 0;
-    for (const lx of LAMPS_ST) { const dx = wx - lx, dy = y - 70; if (dy > 0) v = Math.max(v, clamp(1 - Math.abs(dx) / (10 + dy * 0.55)) * clamp(1.3 - dy / 150)); v = Math.max(v, clamp(1 - Math.hypot(dx, dy) / 40)); }
-    if (wx > SHOP[0] - 20 && wx < SHOP[1] + 20 && y > 110) v = Math.max(v, 0.55 * clamp(1 - Math.abs(wx - (SHOP[0] + SHOP[1]) / 2) / 70));
+    for (const lx of ST.lamps) { if (ST.off(lx)) continue; const dx = wx - lx, dy = y - 70; if (dy > 0) v = Math.max(v, clamp(1 - Math.abs(dx) / (10 + dy * 0.55)) * clamp(1.3 - dy / 150)); v = Math.max(v, clamp(1 - Math.hypot(dx, dy) / 40)); }
+    if (!ST.closed && wx > SHOP[0] - 20 && wx < SHOP[1] + 20 && y > 110) v = Math.max(v, 0.55 * clamp(1 - Math.abs(wx - (SHOP[0] + SHOP[1]) / 2) / 70));
     return v * warm;
   };
 }
@@ -323,14 +325,16 @@ function drawStreet(G, s, cam, st) {
   { const x0 = SHOP2[0] - cam, x1 = SHOP2[1] - cam; if (x1 > -10 && x0 < LW + 10) { G.rect(x0 - 2, 120, x1 - x0 + 4, 60, 0);   // 第二家店：蓝白灯箱的便利店
     for (let y = 134; y < 178; y++) for (let x = x0; x < x1; x++) G.px(x, y, G.dith([26, 7, 8], 0.6 + (y - 134) / 50, x, y));
     G.rect(x0, 122, x1 - x0, 10, 27); for (let x = x0 + 5; x < x1 - 5; x += 9) G.rect(x, 125, 5, 4, 8); G.rect(x0 + 24, 146, 12, 32, 3); } }
+  if (ST.closed) for (const [a, b] of [SHOP, SHOP2]) { const x0 = a - cam, x1 = b - cam; if (x1 < -4 || x0 > LW + 4) continue;   // 卷帘门
+    for (let y = 116; y < 179; y++) for (let x = x0; x < x1; x++) G.px(x, y, y % 4 === 0 ? 2 : G.dith([3, 4, 5], 0.4 + L(x, y) * 1.6, x + cam, y)); G.rect(x0, 116, x1 - x0, 2, 0); }
   // 人行道、路沿、马路
   for (let y = 180; y < 199; y++) for (let x = 0; x < LW; x++) { const wx = x + cam; G.px(x, y, (wx % 24 === 0 && y < 198) ? 3 : G.dith([3, 4, 5], 0.6 + L(x, y) * 2.0 + (y - 180) / 40, wx, y)); }
   for (let x = 0; x < LW; x++) { G.px(x, 198, 6); G.px(x, 199, 0); }
   for (let y = 200; y < LH; y++) for (let x = 0; x < LW; x++) { const wx = x + cam; let c = G.dith([1, 2], 0.4 + (st.rain > 0 ? L(x, 190) * 1.2 : 0), wx, y); if ((wx + 7) % 40 < 18 && y === 220) c = 6; if (wx > ZEBRA[0] && wx < ZEBRA[1] && (wx >> 2) % 2 === 0) c = 6; G.px(x, y, c); }
   // 路灯
-  for (const lx of LAMPS_ST) { const x = lx - cam; if (x < -20 || x > LW + 20) continue;
-    G.rect(x - 1, 70, 3, 112, 0); G.rect(x, 71, 1, 110, 3); G.rect(x - 9, 64, 13, 4, 0); G.rect(x - 8, 68, 10, 2, st.warm > 0.3 ? 24 : 4);
-    if (st.warm > 0.3) for (let k = 0; k < 8; k++) { const dx = Math.round((rnd('lg' + k) - 0.5) * 14), dy = 72 + Math.floor(rnd('lgy' + k + ':' + Math.floor(tf * 6)) * 40); G.px(x - 3 + dx, dy, 23); } }
+  for (const lx of ST.lamps) { const x = lx - cam, lon = st.warm > 0.3 && !ST.off(lx); if (x < -20 || x > LW + 20) continue;
+    G.rect(x - 1, 70, 3, 112, 0); G.rect(x, 71, 1, 110, 3); G.rect(x - 9, 64, 13, 4, 0); G.rect(x - 8, 68, 10, 2, lon ? 24 : 4);
+    if (lon) for (let k = 0; k < 8; k++) { const dx = Math.round((rnd('lg' + k) - 0.5) * 14), dy = 72 + Math.floor(rnd('lgy' + k + ':' + Math.floor(tf * 6)) * 40); G.px(x - 3 + dx, dy, 23); } }
 }
 function drawRain(G, s, amt, tf, region) {
   const [x0, y0, x1, y1] = region || [0, 0, LW, 206];
@@ -469,6 +473,7 @@ function drawHUD(G, n, flash) {
   if (n > 0) G.px(9, 9, 8);
 }
 function heartsAt(s) {
+  if (s >= 117.75 && window.BOOK) return BOOK.hearts(s);
   if (inS(s, 'room1')) return s >= 76.72 && s < 80.85 ? 3 : 1;
   if (inS(s, 'push1') || (s >= 82.92 && s < 96.36)) return 3;
   if (s >= 96.36 && s < 98.45) return 2;
@@ -477,9 +482,10 @@ function heartsAt(s) {
   if (s >= 113.43 && s < 116.01) return 3;
   return 1;
 }
-function heartFlash(s) { for (const [t, i] of [[96.36, 2], [98.45, 1]]) if (s >= t - 1 / 12 && s < t + 2 / 12) return i; if (s >= 117.6 && s < 117.85) return 0; return -1; }
+function heartFlash(s) { if (s >= 117.75 && window.BOOK) return BOOK.flash(s); for (const [t, i] of [[96.36, 2], [98.45, 1]]) if (s >= t - 1 / 12 && s < t + 2 / 12) return i; if (s >= 117.6 && s < 117.85) return 0; return -1; }
 function lyricAt(s) {
-  const Lr = window.LYRICS || []; for (let i = 0; i < Lr.length; i++) { const [a, b, txt] = Lr[i]; if (a < T0 - 0.01 || a > 117.6) continue; /* 只显示片段内的句子；结尾停在第 22 句 */ if (s >= a && (s < b + 0.25 || (a > 116.5 && a < 117.6)) && !(Lr[i + 1] && s >= Lr[i + 1][0] && Lr[i + 1][0] <= 117.6)) return { a, b, txt, i }; }
+  const Lr = window.LYRICS || [];
+  for (let i = 0; i < Lr.length; i++) { const [a, b, txt] = Lr[i], nx = Lr[i + 1]; if (s >= a && s < b + 0.25 && !(nx && s >= nx[0])) return { a, b, txt, i }; }
   return null;
 }
 function drawDialog(G, s) {
@@ -587,8 +593,7 @@ function shotRoom7(G, s) {   // 第 7 镜：回到出租屋，湿着进门坐下
   const flick = BAR.concat(BAR.map((b) => b + 2.04)).some((b) => tf >= b && tf < b + 2 / 12) ? 0.2 : 0.5;
   const st = { s, tf, I: flick, rain: 1 }; drawRoom(G, cam, st);
   const walkU = seg(tf, 99.47, 100.45), light = roomLight(st.I);
-  if (tf < 100.45) CHAR.draw(G, { who: 'him', x: Math.round(lerp(346, HIM_SEAT.x, walkU)), y: 204, size: 90, facing: 'left', action: 'walk', t: tf, light, expression: 'sad' });
-  else {
+  {   // 开头已经进过一次门：这里推屏落下时他已经坐着，从回忆里回过神
     const o = { who: 'him', ...HIM_SEAT, facing: 'left', t: tf, light, expression: 'sad' };
     if (tf < 101.54) Object.assign(o, { action: 'sitHunch', u: clamp(0.6 + sighPose(tf) * 1.2), hold: CHAR.PROPS.phone });
     else if (tf < 103.61) Object.assign(o, { action: 'sitSlump', u: smooth(seg(tf, 101.8, 102.4)) });
@@ -599,7 +604,7 @@ function shotRoom7(G, s) {   // 第 7 镜：回到出租屋，湿着进门坐下
   }
   drawTableTop(G, cam, Object.assign(st, { phoneDown: tf >= 101.54 })); drawLamp(G, cam, st);
   cold(G);
-  if (tf >= 100.45) drawSigh(G, tf, CHAR.headAt({ who: 'him', ...HIM_SEAT, facing: 'left', action: 'sitHunch', u: 0.6, t: tf }));
+  drawSigh(G, tf, CHAR.headAt({ who: 'him', ...HIM_SEAT, facing: 'left', action: 'sitHunch', u: 0.6, t: tf }));
 }
 function zoomCopy(dst, src, cx, cy, z) { for (let y = 0; y < LH; y++) for (let x = 0; x < LW; x++) dst.px(x, y, src.get(Math.floor(cx + (x - LW / 2) / z), Math.floor(cy + (y - LH / 2) / z))); }
 function shotDoor(G, s) {   // 平移到门口 → 第 10 镜（回忆：她走出门，他伸手没够到）→ 平移回桌边
@@ -644,7 +649,8 @@ function pushCopy(dst, A, B, u, dir) {   // dir = 1：新画面从右边推进�
 }
 function frame(t) {
   const s = T0 + t; G.fill(0);
-  if (inS(s, 'room1')) shotRoom1(G, s);
+  if (s < 66.87 || s >= 117.75) BOOK.frame(G, s);   // 开头、结尾
+  else if (inS(s, 'room1')) shotRoom1(G, s);
   else if (inS(s, 'push1')) { shotRoom1(GA, s); shotStreet(GB, 82.92); pushCopy(G, GA, GB, seg(q(s), 82.42, 82.92), 1); }
   else if (inS(s, 'street')) shotStreet(G, s);
   else if (inS(s, 'push2')) { shotStreet(GA, s); shotRoom7(GB, 99.47); pushCopy(G, GA, GB, seg(q(s), 98.97, 99.47), -1); }
@@ -662,10 +668,11 @@ function frame(t) {
   else if (inS(s, 'zoomOut')) { shotDoor(GA, 113.10); const z = [7, 4, 2][Math.min(2, Math.floor((q(s) - 113.10) * 9))]; zoomCopy(G, GA, 160, 65, z); }
   else if (inS(s, 'door')) shotDoor(G, s);
   else shotLast(G, s);
-  GU.B.fill(255); drawHUD(GU, heartsAt(s), heartFlash(q(s))); drawDialog(GU, s);
+  GU.B.fill(255); drawHUD(GU, heartsAt(s), heartFlash(q(s))); drawDialog(GU, s); BOOK.ui(GU, s);
   present(s);
 }
 function memAt(tf) {   // 这一帧有多"回忆"：0 = 现在，1 = 回忆；转场时渐变
+  if (tf >= 126.08 && tf < 128.14) return 0.75;   // 结尾：墙上那张照片的近景
   const r = (a, b) => smooth(seg(tf, a, b));
   if (tf >= 76.72 && tf < 81.1) return r(76.72, 76.9) * (1 - r(80.85, 81.1));
   if (tf >= 82.42 && tf < 99.47) return r(82.42, 82.92) * (1 - r(98.97, 99.47));
@@ -689,10 +696,11 @@ function present(s) {
       o.fillStyle = d < 0.55 ? `rgba(10,8,6,${0.3 * k})` : `rgba(255,246,225,${0.22 * k})`; o.fillRect(rnd('gx' + f + '_' + i) * W, rnd('gy' + f + '_' + i) * H, z, z); }   // 颗粒、灰尘
     if (rnd('sc' + f) < 0.45) { o.fillStyle = `rgba(235,225,200,${0.28 * k})`; o.fillRect(Math.round(rnd('sx' + f) * W), 0, 3, H); }   // 划痕
     if (rnd('hr' + f) < 0.12) { o.fillStyle = `rgba(20,14,8,${0.35 * k})`; o.fillRect(Math.round(rnd('hx' + f) * W), 0, 2, H); }
-  } else o.drawImage(WC, 0, 0);
+  } else { const gr = BOOK.gray(tf); if (gr > 0) o.filter = `grayscale(${gr})`; o.drawImage(WC, 0, 0); o.filter = 'none'; }
   o.restore();
   const d = UIMG.data; for (let i = 0; i < LW * LH; i++) { const c = GU.B[i]; if (c === 255) { d[i * 4 + 3] = 0; continue; } const rgb = PIX.RGB[c]; d[i * 4] = rgb[0]; d[i * 4 + 1] = rgb[1]; d[i * 4 + 2] = rgb[2]; d[i * 4 + 3] = 255; }
   UX.putImageData(UIMG, 0, 0); o.imageSmoothingEnabled = false; o.drawImage(UC, 0, 0, W, H);   // 血条、歌词框：一直清楚
+  const fd = BOOK.fade(tf); if (fd > 0) { o.fillStyle = `rgba(0,0,0,${fd})`; o.fillRect(0, 0, W, H); }
 }
 window.sceneReady = (async () => {
   const fam = await PIX.loadFont('../../../assets/fonts/fusion-pixel-12px-zh_hans.woff2');
@@ -700,4 +708,6 @@ window.sceneReady = (async () => {
   frame(0); return true;
 })();
 window.renderAt = async (t) => { frame(t); return out.toDataURL('image/png'); };
-</script></body></html>
+</script>
+<script src="bookends.js"></script>
+</body></html>
