@@ -281,7 +281,7 @@ function phoneUI(G, tf, hx, hy) {
 const LAMPS_ST = [140, 300, 460, 620, 780];
 const SHOP = [230, 300], SHOP2 = [560, 620], ZEBRA = [420, 470];
 const V = 40;   // 走路速度 px/s
-const GAP = 30; // 两个人前后错开
+const GAP = 17; // 两个人前后错开（伞下挨着走）
 const PAUSES = [[84.90, 85.40], [86.15, 86.90], [90.25, 90.95], [94.35, 95.32]];
 function walked(s, a) { let w = Math.max(0, s - a); for (const [p0, p1] of PAUSES) w -= clamp(Math.min(s, p1) - Math.max(a, p0), 0, 99); return w; }
 const pausedAt = (s) => PAUSES.some(([a, b]) => s >= a && s < b);
@@ -337,13 +337,18 @@ function drawRain(G, s, amt, tf, region) {
   for (let i = 0; i < 160 * amt; i++) { const x = x0 + Math.floor(rnd('sr' + i) * (x1 - x0) + tf * 20) % (x1 - x0), y = y0 + ((rnd('sy' + i) * 300 + tf * 260) % (y1 - y0 + 20)) - 10; for (let k = 0; k < 4; k++) G.px(x - Math.floor(k / 2), y + k, k < 2 ? 6 : 5); }
   for (let i = 0; i < 18 * amt; i++) { const x = Math.floor(rnd('sp' + i + ':' + Math.floor(tf * 8)) * LW), y = 182 + Math.floor(rnd('spy' + i + ':' + Math.floor(tf * 8)) * 16); G.px(x, y, 7); G.px(x - 1, y - 1, 6); G.px(x + 1, y - 1, 6); }
 }
-function drawCar(G, s, cam) {   // 93.0–93.8 从右往左开过去，车灯在前面扫一片
+function drawCar(G, s, cam) {   // 93.0–93.8 从右往左开过去，车灯在前面扫一片；车在马路上，比人行道上的人离镜头近，所以更大
   const u = seg(s, 92.9, 93.8); if (u <= 0 || u >= 1) return;
-  const x = Math.round(lerp(LW + 40, -110, u)), y = 182;
-  for (let yy = 170; yy < 206; yy++) { const w = (yy - 170) * 2.2; for (let xx = x - 140; xx < x; xx++) if (xx - (x - 140) > 140 - w - 60 && PIX.bt(xx, yy) < 0.5 - (x - xx) / 320) G.px(xx, yy, yy % 2 ? 24 : 8); }   // 车灯光
-  G.poly([[x, y + 4], [x + 14, y - 8], [x + 52, y - 8], [x + 64, y + 4], [x + 70, y + 6], [x + 70, y + 18], [x - 4, y + 18], [x - 4, y + 6]], (xx, yy) => G.dith([1, 2, 3], 1 + (yy < y + 4 ? 0.6 : 0), xx, yy), 0);
-  G.rect(x + 18, y - 6, 14, 8, 3); G.rect(x + 34, y - 6, 14, 8, 3); G.rect(x - 4, y + 6, 4, 4, 24); G.rect(x + 66, y + 7, 4, 3, 31);
-  [x + 12, x + 54].forEach((cx) => G.ellipse(cx, y + 18, 5, 5, 0, 0));
+  const x = Math.round(lerp(LW + 30, -175, u)), y = 196, Lc = 146;   // x = 车头，y = 车身腰线
+  for (let yy = 184; yy < 228; yy++) { const w = (yy - 184) * 2.6; for (let xx = x - 170; xx < x; xx++) if (xx - (x - 170) > 170 - w - 70 && PIX.bt(xx, yy) < 0.5 - (x - xx) / 380) G.px(xx, yy, yy % 2 ? 24 : 8); }   // 车灯光
+  const body = [[x, y + 2], [x + 4, y - 8], [x + 30, y - 12], [x + 48, y - 34], [x + 98, y - 34], [x + 120, y - 13], [x + Lc - 4, y - 10], [x + Lc, y], [x + Lc, y + 22], [x, y + 22]];
+  G.poly(body, (xx, yy) => G.dith([1, 2, 3], 0.9 + (yy < y - 12 ? 0.8 : yy < y ? 0.5 : 0) + (yy === y - 11 ? 1 : 0), xx, yy), 0);
+  G.poly([[x + 52, y - 30], [x + 72, y - 30], [x + 72, y - 13], [x + 36, y - 13]], (xx, yy) => G.dith([3, 4, 5], 1 + (xx - x - 40) / 40, xx, yy), 0);    // 前窗
+  G.poly([[x + 76, y - 30], [x + 96, y - 30], [x + 114, y - 13], [x + 76, y - 13]], (xx, yy) => G.dith([3, 4, 5], 0.8 + (xx - x - 76) / 50, xx, yy), 0); // 后窗
+  G.line(x + 8, y + 4, x + Lc - 8, y + 4, 4); G.line(x + 74, y - 10, x + 74, y + 18, 1);                                                            // 腰线、车门缝
+  G.rect(x - 1, y - 6, 6, 5, 24); G.rect(x - 1, y - 6, 3, 5, 8); G.rect(x + Lc - 4, y - 7, 4, 5, 31);                                                // 车头灯、尾灯
+  [x + 28, x + Lc - 28].forEach((cx) => { G.ellipse(cx, y + 22, 11, 11, 0, 0); G.ellipse(cx, y + 22, 5, 5, 3, null); });                             // 轮子
+  for (let i = 0; i < 6; i++) { const xx = x + 10 + i * 24 + Math.floor(rnd('cd' + i) * 10); G.px(xx, y - 33 + (i % 2), 6); }                        // 车顶上的雨点
 }
 function drawSplash(G, s, hx, hy) {
   const u = seg(s, 93.25, 93.75); if (u <= 0 || u >= 1) return;
@@ -522,19 +527,19 @@ function shotStreet(G, s) {   // 第 3–6 镜：夜街，一镜到底往右卷
   const walking = !pausedAt(tf) && tf > 82.95 && tf < 95.32;
   const herWalk = (tf > 83.75 && walking) || tf > 95.32;
   // 他的动作
-  const him = { who: 'him', x: himX, y: himY, size: 76, facing: 'right', t: tf, light, expression: 'neutral', action: walking ? 'walk' : 'idle' };
+  const him = { who: 'him', x: himX, y: himY, size: 54, facing: 'right', t: tf, light, expression: 'neutral', action: walking ? 'walk' : 'idle' };
   const shrug = [[86.15, 86.90], [90.25, 90.95], [94.35, 95.32]].find(([a, b]) => tf >= a && tf < b);
   const umbrella = tf >= 87.05 && tf < 98.45;
   if (tf >= 84.9 && tf < 85.4) Object.assign(him, { action: 'pat', u: smooth(seg(tf, 84.9, 84.98)), expression: 'shy' });
   if (shrug) Object.assign(him, { facing: 'front', action: 'shrug', u: smooth(seg(tf, shrug[0], shrug[0] + 0.25)), expression: 'happy' });
   if (umbrella && !shrug) Object.assign(him, { arms: 'holdHigh', armsU: tf >= 97.4 ? 1 - smooth(seg(tf, 97.4, 98.4)) : 1 });
-  if (umbrella) him.hold = CHAR.PROPS.umbrella;
+  if (umbrella) Object.assign(him, { hold: CHAR.PROPS.umbrella, umbrellaW: 30, umbrellaH: 26 }); if (umbrella && tf < 95.32) him.umbrellaDX = Math.round((himX + herX) / 2 + (herX > himX ? 3 : -3) - CHAR.handAt(him).x);   // 伞面罩住两个人，略偏向她那边
   if (tf >= 95.32) Object.assign(him, { action: tf >= 98.45 ? 'slump' : 'idle', u: smooth(seg(tf, 98.45, 98.9)), expression: 'sad', facing: 'right' });
-  const her = { who: 'her', x: herX, y: herY, size: 70, facing: 'right', t: tf, light, action: herWalk ? 'walk' : 'idle', expression: tf < 95.32 ? 'happy' : 'sad' };
+  const her = { who: 'her', x: herX, y: herY, size: 50, facing: 'right', t: tf, light, action: herWalk ? 'walk' : 'idle', expression: tf < 95.32 ? 'happy' : 'sad' };
   const drawOrder = himY < herY ? [him, her] : [her, him];
   for (const o of drawOrder) CHAR.draw(G, o);
-  if (tf >= 98.45) { const x = himX + 10, y = himY; G.shape([x - 2, y - 8, x + 26, y + 2], (xx, yy) => yy > y - 6 && yy < y && Math.abs(xx - x - 12) < 12 - (y - yy), (xx, yy) => G.dith([2, 3], 1, xx, yy), 0); G.line(x - 4, y - 2, x + 2, y - 2, 0); }   // 掉在地上的伞
-  drawCar(G, tf, S.cam); drawSplash(G, tf, himX, himY - 30);
+  if (tf >= 98.45) { const x = himX + 8, y = himY; G.shape([x - 2, y - 10, x + 52, y + 2], (xx, yy) => yy > y - 9 && yy < y && Math.abs(xx - x - 24) < 26 - (y - yy) * 2.4, (xx, yy) => G.dith([2, 3], 1, xx, yy), 0); G.line(x - 4, y - 2, x + 2, y - 2, 0); }   // 掉在地上的伞
+  drawCar(G, tf, S.cam); drawSplash(G, tf, himX, himY - 18);
   if (rain > 0) drawRain(G, s, rain, tf);
 }
 function shotRoom7(G, s) {   // 第 7 镜：回到出租屋，湿着进门坐下，扣手机，趴在桌上
@@ -574,7 +579,16 @@ function shotDoor(G, s) {   // 平移到门口 → 第 10 镜（回忆：她走�
     const tmp = PIX.create(LW, LH); tmp.B.fill(255);
     const glance = tf >= 114.3 && tf < 114.95;   // 走之前回头看他一眼
     CHAR.draw(tmp, { who: 'her', x, y, size, facing: glance ? 'left' : 'back', action: u > 0 ? 'walk' : 'idle', t: tf, light, expression: 'sad' });
-    const bx = x - Math.round(size * (glance ? -0.06 : 0.11)), by = y - Math.round(size * 0.66); tmp.rect(bx - 1, by - 1, Math.round(size * 0.24) + 2, Math.round(size * 0.24) + 2, 0); tmp.rect(bx, by, Math.round(size * 0.24), Math.round(size * 0.24), 14);   // 背包
+    { // 链条水桶包：挎在肩上，包身落在腰侧
+      const sd = glance ? -1 : 1, bw = Math.max(9, Math.round(size * 0.21)), bh = Math.max(8, Math.round(size * 0.2));
+      const bx = Math.round(x + sd * size * 0.15 - bw / 2), by = Math.round(y - size * 0.5), shx = Math.round(x + sd * size * 0.09), shy = Math.round(y - size * 0.8);
+      const gold = (xx, yy) => ((xx + yy) % 2 ? 23 : 25);
+      tmp.line(shx, shy, bx + 1, by, gold); tmp.line(shx + sd, shy, bx + bw - 2, by, gold);                                                          // 金色链条肩带
+      tmp.shape([bx - 1, by - 1, bx + bw + 1, by + bh + 1], (xx, yy) => { const v = (yy - by) / bh; return v >= 0 && v <= 1 && Math.abs(xx - bx - bw / 2) <= bw / 2 - (v < 0.2 ? (0.2 - v) * bw * 0.6 : 0) + (v > 0.85 ? -(v - 0.85) * 6 : 0); },
+        (xx, yy) => (((xx - bx) + (yy - by)) % 4 === 0 || ((xx - bx) - (yy - by) + 64) % 4 === 0 ? 1 : G.dith([0, 1, 2], 1 + light(xx, yy) * 0.8, xx, yy)), 0);   // 黑色菱格皮，上口收紧
+      tmp.rect(bx + Math.floor(bw / 2) - 1, by + 1, 2, 1, 24);                                                                                     // 金色扣
+      for (let k = 0; k < Math.round(bh * 0.5); k++) tmp.px(bx + Math.floor(bw / 2) + (k % 3 === 2 ? 1 : 0), by + 2 + k, gold(k, 0));               // 垂下来的抽绳链
+    }
     const [d0, dy0, d1] = [DOOR[0] - cam, DOOR[1], DOOR[2] - cam], leafW = Math.round((d1 - d0) * (1 - st.door));
     for (let i = 0; i < LW * LH; i++) { if (tmp.B[i] === 255) continue; const px = i % LW, py = (i / LW) | 0; if (u > 0.6 && (px < d0 || px >= d1 - leafW || py < dy0)) continue; G.B[i] = tmp.B[i]; }
   }

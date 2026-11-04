@@ -21,6 +21,7 @@
      o.seat       坐高（逻辑像素，默认 0.33 × size）
      o.light      (x, y) → 0..1 这一格被照得多亮（镜头给；默认 0.55）
      o.hold       道具 CHAR.PROPS.phone / bowl / umbrella，或任何 { draw(G, hand, o) }
+                  伞另有 o.umbrellaW（伞面半宽）、o.umbrellaDX（伞面相对手的偏移）、o.umbrellaH（伞杆长，按 56 身高计）
    CHAR.handAt(o, 'near' | 'far') → { x, y, angle }
    CHAR.drawHead(G, o)      只画头（近景、表情表）：o.x, o.y 头中心，o.r 头半径（≥10 时画细节版五官）
    纯函数：只看参数，不存状态。 */
@@ -271,9 +272,11 @@
     phone: { draw(G, h, o) { const s = Math.max(1, Math.round(o.size / 56)); G.rect(h.x - 2 * s, h.y - 5 * s, 4 * s, 6 * s, C.ink); G.rect(h.x - s, h.y - 4 * s, 2 * s, 4 * s, C.phone); } },
     bowl: { draw(G, h, o) { const k = o.size / 56, y = h.y - Math.round(3 * k); G.poly([[h.x - 5 * k, y - 2 * k], [h.x + 5 * k, y - 2 * k], [h.x + 3 * k, y + 2 * k], [h.x - 3 * k, y + 2 * k]], (x, yy) => G.dith(RAMP.porcelain, 2.2, x, yy), 0); G.ellipse(h.x, y - 2.6 * k, 4 * k, 1.6 * k, C.cream, 0); } },
     umbrella: { draw(G, h, o) {   // 伞杆竖直，手握在杆上
-      const k = o.size / 56, top = h.y - Math.round(30 * k), w = Math.round(22 * k);
-      G.line(h.x, h.y + 2, h.x, top, C.ink); G.px(h.x - 1, h.y + 3, C.ink); G.px(h.x - 2, h.y + 2, C.ink);
-      G.shape([h.x - w - 1, top - 12 * k, h.x + w + 1, top + 2], (x, y) => { const dx = (x - h.x) / w, dy = (y - top) / (11 * k); return dx * dx + dy * dy <= 1 && y <= top + 1 - Math.abs(Math.sin((x - h.x) / w * Math.PI * 3)) * 2 * k; }, (x, y) => G.dith([2, 3, 4], 1.2 - (y - top) / (12 * k) - (x - h.x) / (w * 2), x, y), 0);
+      const k = o.size / 56, top = h.y - Math.round((o.umbrellaH ?? 30) * k), w = Math.round(o.umbrellaW ?? 22 * k), cx = h.x + Math.round(o.umbrellaDX || 0), dh = Math.max(11 * k, w * 0.42);
+      G.line(h.x, h.y + 2, cx, top, C.ink); G.px(h.x - 1, h.y + 3, C.ink); G.px(h.x - 2, h.y + 2, C.ink);   // 伞杆（伞面偏过去时斜着）
+      G.shape([cx - w - 1, top - dh - 1, cx + w + 1, top + 3], (x, y) => { const dx = (x - cx) / w, dy = (y - top) / dh; return dx * dx + dy * dy <= 1 && y <= top + 1 - Math.abs(Math.sin((x - cx) / w * Math.PI * 4)) * 2 * Math.max(1, k); }, (x, y) => G.dith([2, 3, 4], 1.2 - (y - top) / dh - (x - cx) / (w * 2), x, y), 0);
+      for (const f of [-0.5, 0, 0.5]) G.line(cx, top - dh + 1, cx + Math.round(f * w), top, (x, y) => G.dith([1, 2], 1.2, x, y));   // 伞骨
+      G.px(cx, top - dh - 1, C.ink);
     } },
   };
   function headAt(o) {   // 头的中心和半径（画眼泪、头顶冒字用）
