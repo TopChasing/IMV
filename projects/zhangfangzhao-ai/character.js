@@ -210,7 +210,7 @@
   function draw(G, o) {
     o = Object.assign({ who: 'him', size: 56, facing: 'left', expression: 'neutral', action: 'idle', u: 1, t: 0 }, o);
     const light = o.light || (() => 0.55);
-    const J = solve(o), S = J.S, k = o.size / REF, mx = o.facing === 'right' ? -1 : 1, ox = Math.round(o.x), oy = Math.round(o.y);
+    const J = solve(o), S = o.outfit === 'rider' ? Object.assign({}, J.S, { sleeve: 0.98 }) : J.S, k = o.size / REF, mx = o.facing === 'right' ? -1 : 1, ox = Math.round(o.x), oy = Math.round(o.y);
     const W = (p) => [ox + p[0] * k * mx * J.P.sx, oy + p[1] * k * J.P.sy];
     const shade = (ramp, base, gain = 1.4) => (x, y) => G.dith(ramp, base + light(x, y) * gain, x, y);
     const r = (v) => Math.max(1, v * k);
@@ -265,6 +265,12 @@
     else if (J.view === 'side') { drawArm(J.armB, true); drawLeg(J.legB, true); drawLeg(J.legA, false); neck(); drawTorso(); drawHead(); drawArm(J.armA, false); }
     else if (J.view === 'front') { drawLeg(J.legA, false); drawLeg(J.legB, false); neck(); drawTorso(); drawArm(J.armA, false); drawArm(J.armB, false); drawHead(); }
     else { drawLeg(J.legA, false); drawLeg(J.legB, false); drawTorso(); drawArm(J.armA, false); drawArm(J.armB, false); drawHead(); }
+    if (o.outfit === 'rider') {   // 外卖头盔：黄色半圆壳，下沿一圈深色，侧面前面一块深色护目
+      const h = W(J.head), R = S.headR * k, cx = h[0], cy = h[1], fx = J.view === 'side' ? -mx : 0;
+      G.shape([cx - 1.4 * R, cy - 1.5 * R, cx + 1.4 * R, cy + 0.3 * R], (x, y) => { const u = (x - cx) / (1.16 * R), v = (y - cy + 0.14 * R) / (1.12 * R); return v <= 0.2 && u * u + v * v <= 1; },
+        (x, y) => { const u = (x - cx) / (1.16 * R), v = (y - cy + 0.14 * R) / (1.12 * R); if (v > 0.06) return 13; if (fx && u * fx > 0.55 && v > -0.45) return 2; return G.dith([25, 23, 24], 1.0 + light(x, y) * 1.3 - v * 0.8, x, y); }, 0);
+    }
+    if (o.earbud && J.view === 'side') { const h = W(J.head), R = S.headR * k; G.px(Math.round(h[0] + mx * R * 0.16), Math.round(h[1] + R * 0.3), 8); }   // 一只耳机
     if (o.hold && o.hold.draw) o.hold.draw(G, handAt(o, o.holdHand || 'near'), o);
   }
   function handAt(o, which = 'near') {
