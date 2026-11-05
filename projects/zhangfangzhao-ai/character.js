@@ -78,9 +78,10 @@
     if (act === 'hug') return mix(base, over(base, { lean: 0.12, tilt: 0.16, as: -1.3, ae: -1.2, bs: -1.18, be: -1.3 }), smooth(u));
     if (act === 'hold') return mix(base, over(base, { as: -0.38, ae: -1.55, bs: -0.28, be: -1.5, tilt: 0.18 }), smooth(u));
     if (act === 'holdHigh') return mix(base, over(base, { as: -0.75, ae: -1.85, bs: 0.0, be: -0.25, tilt: -0.05 }), smooth(u));
-    if (act === 'sit' || act === 'sitHunch' || act === 'sitHold' || act === 'sitSlump') {
+    if (act === 'sit' || act === 'sitHunch' || act === 'sitHold' || act === 'sitSlump' || act === 'sitChin') {
       const sit = over(base, { bodyY: -(seat + 18) - HIP_Y, plantA: -150, plantB: -128, as: -0.45, ae: -0.55, bs: -0.4, be: -0.6, lean: 0.06, tilt: 0.1 });
       if (act === 'sit') return sit;
+      if (act === 'sitChin') return mix(sit, over(sit, Object.assign({ lean: 0.35, tilt: 0.02, as: -0.7, ae: -2.5, bs: -0.65, be: -2.45 }, o.chin || {})), smooth(u));   // 坐着，手肘撑在膝盖上托着下巴
       if (act === 'sitHold') return mix(sit, over(sit, { as: -0.38, ae: -1.55, bs: -0.28, be: -1.5, tilt: 0.12 }), smooth(u));
       if (act === 'sitSlump') return mix(sit, over(sit, { lean: 0.95, tilt: 0.75, as: -1.25, ae: -0.55, bs: -1.15, be: -0.6 }), smooth(u));   // 趴在桌上，额头抵着胳膊
       return mix(sit, over(sit, { lean: 0.62, tilt: 0.42, as: -0.72, ae: -1.12, bs: -0.62, be: -1.22 }), smooth(u));
