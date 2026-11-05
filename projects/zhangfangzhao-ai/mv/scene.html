@@ -44,53 +44,13 @@ function blinkIn(s, t0) { if (s < t0) return false; const k = Math.floor((s - t0
 function blinkOut(s, t0) { if (s < t0) return true; const k = Math.floor((s - t0) * 12); return k < 6 && k % 2 === 1; }
 
 // ============================== 房间（世界宽 480） ==============================
-const FLOOR = 172, TABLE_Y = 158, LAMP = [160, 47], DOOR = [352, 92, 392, 172], PC = [196, 54, 34, 22];
-const HIM_SEAT = { x: 239, y: 204, size: 90, seat: 28 }, HER_SEAT = { x: 78, y: 204, size: 84, seat: 28 };
-function roomLight(I, sw = 0) {   // 世界坐标的灯光，I = 灯的亮度（回忆 1，现在 0.5）
-  return (x, y) => {
-    const dx = x - LAMP[0] - sw, dy = y - LAMP[1];   // sw = 吊灯摆到哪
-    let v = clamp(1 - Math.hypot(dx, dy * 1.15) / 120) * 0.9;
-    if (dy > 0) { const w = 12 + dy * 0.9; v = Math.max(v, clamp(1 - Math.abs(dx) / w) * clamp(1.25 - dy / 170)); }
-    return v * I;
-  };
-}
-function drawRoom(G, cam, st) {
-  const s = st.s, Lw = roomLight(st.I, st.sway || 0), L = (x, y) => Lw(x + cam, y);
-  const door = st.door ?? 0;
-  // 墙、地板
-  for (let y = 0; y < FLOOR; y++) for (let x = 0; x < LW; x++) G.px(x, y, G.dith(RAMP.wall, 0.35 + L(x, y) * 3.2 * st.I - (y < 6 ? 0.4 : 0), x + cam, y));
-  for (let x = 0; x < LW; x++) { G.px(x, FLOOR - 3, 9); G.px(x, FLOOR - 2, G.dith([13, 14], 0.3 + L(x, FLOOR) * 1.5, x + cam, 0)); G.px(x, FLOOR - 1, 13); }
-  for (let y = FLOOR; y < LH; y++) { const row = Math.floor((y - FLOOR) / 9); for (let x = 0; x < LW; x++) { const wx = x + cam, joint = (wx + row * 37) % 71 === 0, sm = (y - FLOOR) % 9 === 0; G.px(x, y, sm || joint ? 13 : G.dith(RAMP.floor, 0.35 + L(x, y) * 2.2 + (y - FLOOR) / 160, wx, y)); } }
-  // 门（开着时露出楼道的暖光，地上一块光）
-  const [d0, dy0, d1, dy1] = DOOR.map((v, i) => (i % 2 === 0 ? v - cam : v));
-  G.rect(d0 - 3, dy0 - 3, d1 - d0 + 6, dy1 - dy0 + 3, 0); G.rect(d0 - 2, dy0 - 2, d1 - d0 + 4, dy1 - dy0 + 2, 14);
-  const leafW = Math.round((d1 - d0) * (1 - door));
-  for (let y = dy0; y < dy1; y++) for (let x = d0; x < d1; x++) {
-    if (x - d0 < (d1 - d0) - leafW) G.px(x, y, G.dith([25, 23, 24], 1.1 + (y - dy0) / 90, x, y));                  // 楼道灯
-    else G.px(x, y, G.dith(RAMP.wood, 0.6 + L(x, y) * 1.6 + ((x - d0) % 13 === 0 ? -0.6 : 0), x, y));             // 门板
-  }
-  if (leafW > 4) G.px(d1 - leafW + 4, dy0 + 44, 23);                                                               // 门把手
-  if (door > 0.05) for (let y = FLOOR; y < LH; y++) { const sp = (y - FLOOR) * 0.5 * door; for (let x = Math.round(d0 - sp); x < d0 + (d1 - d0 - leafW) + sp; x++) if (PIX.bt(x + cam, y) < 0.55 * door) G.px(x, y, (y - FLOOR) % 9 === 0 ? 15 : 16); }
-  // 窗（外面城市 + 雨）
-  const WX0 = 26, WY0 = 44, WX1 = 88, WY1 = 100, X0 = WX0 - cam, Y0 = WY0, X1 = WX1 - cam, Y1 = WY1;
-  for (let y = Y0; y <= Y1; y++) for (let x = X0; x <= X1; x++) G.px(x, y, (st.dawn > 0.55 && y > Y1 - 8 && PIX.bt(x, y) < (st.dawn - 0.55) * 2 ? 23 : G.dith([1, 2, 3, 4, 5, 6, 7], 0.3 + ((y - Y0) / (Y1 - Y0)) * 2.4 + (st.dawn || 0) * 3.4, x, y)));
-  [[20, 78, 14], [33, 66, 12], [44, 86, 16], [59, 58, 11], [69, 74, 13], [81, 90, 10], [90, 70, 15]].map(([bx, by, bw]) => [Math.round(WX0 + (bx - 20) * 62 / 84), Math.round(WY0 + (by - 34) * 56 / 84), Math.max(6, Math.round(bw * 62 / 84))]).forEach(([bx, by, bw], i) => {
-    for (let y = by; y <= Y1; y++) for (let x = bx; x < Math.min(bx + bw, WX1 + 1); x++) G.px(x - cam, y, 1);
-    for (let y = by + 3; y < Y1 - 2; y += 4) for (let x = bx + 2; x < Math.min(bx + bw - 1, WX1); x += 3) if (rnd('w' + i + ':' + x + ':' + y) < 0.22 && !(rnd('wb' + i + x + y + ':' + Math.floor(st.tf * 0.5)) < 0.04)) G.px(x - cam, y, 25);
-  });
-  if (st.rain > 0) for (let i = 0; i < 45 * st.rain; i++) { const x = X0 + Math.floor(rnd('rr' + i) * (X1 - X0 + 1)), y0 = Y0 + ((rnd('ry' + i) * 120 + st.tf * 150) % (Y1 - Y0 + 16)); for (let k = 0; k < 3; k++) if (y0 + k <= Y1) G.px(x, y0 + k, 6); }
-  shapeFrame(G, X0, Y0, X1, Y1, L, cam);
-  drawWallPhoto(G, cam, L);
-  drawClock(G, cam, st.tf, L);
-  drawDesk(G, cam, L, st);
-  // 地上的影子
-  for (let y = FLOOR + 22; y < FLOOR + 36; y++) for (let x = 60; x < 280; x++) if (((x - 165) / 100) ** 2 + ((y - FLOOR - 30) / 6) ** 2 < 1 && PIX.bt(x, y) < 0.6) G.px(x - cam, y, 13);
-  // 凳子、桌子
-  const stool = (x0, x1) => { G.poly([[x0 - cam, 176], [x1 - cam, 176], [x1 - cam, 180], [x0 - cam, 180]], (x, y) => G.dith(RAMP.wood, 0.8 + L(x, y) * 2.4, x, y), 0); [[x0 + 3, x0 + 6], [x1 - 6, x1 - 3]].forEach(([a, b]) => G.poly([[a - cam, 180], [b - cam, 180], [b + 1 - cam, 205], [a - 1 - cam, 205]], (x, y) => G.dith(RAMP.wood, 0.3 + L(x, y) * 1.2, x, y), 0)); };
-  stool(62, 94); stool(222, 256);
-  G.poly([[110 - cam, TABLE_Y + 4], [113 - cam, TABLE_Y + 4], [114 - cam, 200], [109 - cam, 200]], (x, y) => G.dith(RAMP.wood, 0.5 + L(x, y) * 1.6, x, y), 0);
-  G.poly([[206 - cam, TABLE_Y + 4], [209 - cam, TABLE_Y + 4], [210 - cam, 200], [205 - cam, 200]], (x, y) => G.dith(RAMP.wood, 0.4 + L(x, y) * 1.5, x, y), 0);
-}
+// v6：房间统一用 room6.js 的平面图。中段镜头沿用旧坐标，旧坐标 + RC = room6 世界坐标
+const RC = 120;
+const FLOOR = 172, TABLE_Y = 158, LAMP = [180, 47], DOOR = [316, 92, 356, 172], PC = [196, 54, 34, 22];
+const HIM_SEAT = { x: 237, y: 204, size: 90, seat: 28 }, HER_SEAT = { x: 123, y: 204, size: 84, seat: 28 };
+const PHOTO_C = () => [ROOM6.WP[0] + 16 - RC, ROOM6.WP[1] + 12];   // 墙上拍立得中心（旧坐标）
+function roomLight(I, sw = 0) { const f = ROOM6.light({ I, sway: sw }); return (x, y) => f(x + RC, y); }
+function drawRoom(G, cam, st) { ROOM6.draw(G, cam + RC, Object.assign({}, st, { clock: st.clock ?? clockSec(st.tf ?? st.s ?? 0), photo: st.photo ?? wallPhotoPixels() })); }
 function drawDesk(G, cam, L, st) {   // 靠窗的书桌：廉价麦克风 + 防喷罩、耳机、写满字的歌词本
   const X = (v) => v - cam, top = 146; if (X(62) < -2) return;
   const lit = (x, y) => L(x, y) + 0.18;
@@ -173,26 +133,8 @@ function shapeFrame(G, X0, Y0, X1, Y1, L, cam) {
   G.shape([X0 - 4, Y0 - 4, X1 + 4, Y1 + 4], (x, y) => x < X0 || x > X1 + 1 || y < Y0 || y > Y1 + 1 || Math.abs(x - (X0 + X1 + 1) / 2) < 1.5 || Math.abs(y - (Y0 + Y1) / 2) < 1.5, (x, y) => G.dith([13, 14, 15], 0.6 + L(x, y) * 1.4, x, y), 0);
   G.poly([[X0 - 8, Y1 + 4], [X1 + 8, Y1 + 4], [X1 + 6, Y1 + 9], [X0 - 6, Y1 + 9]], (x, y) => G.dith(RAMP.wood, 1.2 + L(x, y) * 2, x, y), 0);
 }
-function drawTableTop(G, cam, st) {
-  const Lw = roomLight(st.I, st.sway || 0), L = (x, y) => Lw(x + cam, y);
-  G.poly([[104 - cam, TABLE_Y], [216 - cam, TABLE_Y], [216 - cam, TABLE_Y + 3], [104 - cam, TABLE_Y + 3]], (x, y) => G.dith(RAMP.wood, 1.4 + L(x, y) * 2.6, x, y), 0);
-  G.poly([[106 - cam, TABLE_Y + 3], [214 - cam, TABLE_Y + 3], [214 - cam, TABLE_Y + 7], [106 - cam, TABLE_Y + 7]], (x, y) => G.dith(RAMP.wood, 0.6 + L(x, y) * 1.8, x, y), 0);
-  const bowl = (cx, full) => { cx -= cam; const y = TABLE_Y - 5;
-    G.poly([[cx - 6, y], [cx + 6, y], [cx + 5, y + 3], [cx + 2, y + 5], [cx - 2, y + 5], [cx - 5, y + 3]], (x, yy) => (yy === y + 1 ? 4 : G.dith(RAMP.porcelain, 1.2 + L(x, yy) * 2 - (x - cx) / 10, x, yy)), 0);
-    if (full) G.ellipse(cx, y - 1, 5, 2.2, (x, yy) => G.dith([6, 29, 8], 0.8 + L(x, yy) * 1.6 - (yy - y + 3) / 4, x, yy), 0); };
-  bowl(128, true); for (let x = 119; x <= 138; x++) { G.px(x - cam, TABLE_Y - 8, 16); G.px(x + 1 - cam, TABLE_Y - 7, 15); }   // 她那碗：没动，筷子摆整齐
-  bowl(190, false); G.line(180 - cam, TABLE_Y - 1, 199 - cam, TABLE_Y - 1, 16); G.line(181 - cam, TABLE_Y - 2, 200 - cam, TABLE_Y - 2, 15);
-  if (st.phoneDown) { G.rect(205 - cam, TABLE_Y - 2, 9, 2, 0); G.px(207 - cam, TABLE_Y - 3, 2); }   // 扣在桌上的手机
-}
-function drawLamp(G, cam, st) {
-  const lx = LAMP[0] - cam + (st.sway || 0); G.line(LAMP[0] - cam, 0, lx, 36, 0);
-  G.poly([[lx - 6, 36], [lx + 6, 36], [lx + 17, 46], [lx - 17, 46]], (x, y) => G.dith([2, 3, 4], 0.4 + (y - 36) / 8 + (x < lx ? 0.6 : 0), x, y), 0);
-  const on = st.I > 0.2;
-  for (let x = lx - 15; x <= lx + 15; x++) G.px(x, 46, on ? 23 : 3);
-  G.ellipse(lx, 48, 3, 2, (x, y) => (on ? (Math.hypot(x - lx, y - 48) < 1.6 ? 24 : 23) : 4), null);
-  const k = Math.floor(st.tf * 4);   // 光锥里的灰尘
-  if (on) for (let i = 0; i < 14; i++) { const y = 60 + ((rnd('d' + i) * 85 + st.tf * (2 + rnd('ds' + i) * 3)) % 85), x = lx + (rnd('dx' + i) - 0.5) * (20 + (y - 47) * 1.6) + Math.sin(st.tf * 0.7 + i) * 2; if (rnd('dk' + i + ':' + k) < 0.75) G.px(x, y, i % 4 ? 23 : 24); }
-}
+function drawTableTop(G, cam, st) { ROOM6.drawTop(G, cam + RC, st); }
+function drawLamp(G, cam, st) {}   // 吊灯在 ROOM6.drawTop 里画
 // 第 1 镜：hook 段，他手机里弹出聊天界面（暗色模式），一拍往上翻一条聊天记录
 // 灰气泡 = 她（左），绿气泡 = 他（右）。气泡里只有色块，不写字（歌词以外不加字）
 const PH_OPEN = [66.87, 67.12], PH_CLOSE = [74.38, 74.63];
@@ -595,41 +537,41 @@ function shotStreet(G, s) {   // 第 3–6 镜：夜街，一镜到底往右卷
   drawSay(G, tf, CHAR.headAt(him));
   if (rain > 0) drawRain(G, s, rain, tf);
 }
-function shotRoom7(G, s) {   // 第 7 镜：回到出租屋，湿着进门坐下，扣手机，趴在桌上
-  const tf = q(s), cam = 0;
+function shotRoom7(G, s, cam = 0) {   // 第 7 镜：坐在桌边，扣手机，趴在桌上；最后抬眼看墙上的照片
+  const tf = q(s);
   const flick = BAR.concat(BAR.map((b) => b + 2.04)).some((b) => tf >= b && tf < b + 2 / 12) ? 0.2 : 0.5;
   const st = { s, tf, I: flick, rain: 1 }; drawRoom(G, cam, st);
-  const walkU = seg(tf, 99.47, 100.45), light = roomLight(st.I);
+  const lr = roomLight(st.I), light = (x, y) => lr(x + cam, y);
   {   // 开头已经进过一次门：这里推屏落下时他已经坐着，从回忆里回过神
-    const o = { who: 'him', ...HIM_SEAT, facing: 'left', t: tf, light, expression: 'sad' };
+    const o = { who: 'him', ...HIM_SEAT, x: HIM_SEAT.x - cam, facing: 'left', t: tf, light, expression: 'sad' };
     if (tf < 101.54) Object.assign(o, { action: 'sitHunch', u: clamp(0.6 + sighPose(tf) * 1.2), hold: CHAR.PROPS.phone });
     else if (tf < 103.61) Object.assign(o, { action: 'sitSlump', u: smooth(seg(tf, 101.8, 102.4)) });
     else Object.assign(o, { action: 'sitHunch', u: 0.35 });   // 抬眼看明信片
     CHAR.draw(G, o);
     // 头发上滴水
-    if (tf < 103.61) for (let i = 0; i < 3; i++) { const k = ((tf * 3 + i / 3) % 1); G.px(HIM_SEAT.x - 8 + i * 6, 120 + k * 40, 26); }
+    if (tf < 103.61) for (let i = 0; i < 3; i++) { const k = ((tf * 3 + i / 3) % 1); G.px(HIM_SEAT.x - cam - 8 + i * 6, 120 + k * 40, 26); }
   }
   drawTableTop(G, cam, Object.assign(st, { phoneDown: tf >= 101.54 })); drawLamp(G, cam, st);
   cold(G);
-  drawSigh(G, tf, CHAR.headAt({ who: 'him', ...HIM_SEAT, facing: 'left', action: 'sitHunch', u: 0.6, t: tf }));
+  drawSigh(G, tf, CHAR.headAt({ who: 'him', ...HIM_SEAT, x: HIM_SEAT.x - cam, facing: 'left', action: 'sitHunch', u: 0.6, t: tf }));
 }
 function zoomCopy(dst, src, cx, cy, z) { for (let y = 0; y < LH; y++) for (let x = 0; x < LW; x++) dst.px(x, y, src.get(Math.floor(cx + (x - LW / 2) / z), Math.floor(cy + (y - LH / 2) / z))); }
 function shotDoor(G, s) {   // 第 10 镜（回忆：她走出门，他伸手没够到）。镜头不动；门关上后屋里空一下
-  const tf = q(s), cam = 160;
+  const tf = q(s), cam = 124;
   const memory = tf < 116.01, cool = smooth(seg(tf, 116.01, 116.4));
   const door = tf < 115.85 ? 1 : 1 - seg(tf, 115.85, 116.01);
   const st = { s, tf, I: memory ? 1 : lerp(1, 0.5, cool), rain: 0.6, door: Math.round(door * 4) / 4 };
   drawRoom(G, cam, st);
   const light = (x, y) => roomLight(st.I)(x + cam, y);
   if (tf < 116.01) {
-    const u = smooth(seg(tf, 115.35, 115.9)), x = 372 - cam, y = Math.round(lerp(200, 174, u)), size = Math.round(lerp(78, 62, u));
+    const u = smooth(seg(tf, 115.35, 115.9)), x = 336 - cam, y = Math.round(lerp(200, 174, u)), size = Math.round(lerp(78, 62, u));
     const tmp = PIX.create(LW, LH); tmp.B.fill(255);
     const glance = tf >= 113.55 && tf < 115.1;   // 走之前转过来对他说那句话
     CHAR.draw(tmp, { who: 'her', x, y, size, facing: glance ? 'left' : 'back', action: u > 0 ? 'walk' : 'idle', t: tf, light, expression: 'sad' });
     const [d0, dy0, d1] = [DOOR[0] - cam, DOOR[1], DOOR[2] - cam], leafW = Math.round((d1 - d0) * (1 - st.door));
     for (let i = 0; i < LW * LH; i++) { if (tmp.B[i] === 255) continue; const px = i % LW, py = (i / LW) | 0; if (u > 0.6 && (px < d0 || px >= d1 - leafW || py < dy0)) continue; G.B[i] = tmp.B[i]; }
   }
-  if (blinkOut(s, 116.2)) CHAR.draw(G, { who: 'him', x: 300 - cam, y: 204, size: 90, facing: 'right', action: 'reach', u: smooth(seg(tf, 115.3, 115.8)), t: tf, light, expression: 'sad' });
+  if (blinkOut(s, 116.2)) CHAR.draw(G, { who: 'him', x: 264 - cam, y: 204, size: 90, facing: 'right', action: 'reach', u: smooth(seg(tf, 115.3, 115.8)), t: tf, light, expression: 'sad' });
   drawTableTop(G, cam, st); drawLamp(G, cam, st);
   if (cool > 0.5) cold(G);
 }
@@ -655,9 +597,9 @@ function frame(t) {
   else if (inS(s, 'street')) shotStreet(G, s);
   else if (inS(s, 'push2')) { shotStreet(GA, s); shotRoom7(GB, 99.47); pushCopy(G, GA, GB, seg(q(s), 98.97, 99.47), -1); }
   else if (inS(s, 'room7') || inS(s, 'zoomIn')) {
-    const tf = q(s), pan = Math.round(53 * smooth(seg(tf, 103.61, 104.12)));
+    const tf = q(s), [pcx, pcy] = PHOTO_C(), PAN = pcx - 160, pan = Math.round(PAN * smooth(seg(tf, 103.61, 104.12)));
     if (tf < 103.61) shotRoom7(G, s);
-    else { shotRoom7(GA, s); GB.fill(0); const z = tf < 104.12 ? 1 : [2, 4, 7][Math.min(2, Math.floor((tf - 104.12) * 6))]; zoomCopy(G, GA, 160 + pan * (z === 1 ? 1 : 0) + (z > 1 ? 53 : 0), z > 1 ? 65 : 120, z); }
+    else { const z = tf < 104.12 ? 1 : [2, 4, 7][Math.min(2, Math.floor((tf - 104.12) * 6))]; shotRoom7(GA, s, z === 1 ? pan : PAN); zoomCopy(G, GA, 160, z > 1 ? pcy : 120, z); }
   }
   else if (inS(s, 'sea')) seaFrame(G, s);
   else if (inS(s, 'sweep')) {   // 大浪从左往右扫过，浪后面露出近景
@@ -671,14 +613,13 @@ function frame(t) {
   present(s);
 }
 function memAt(tf) {   // 这一帧有多"回忆"：0 = 现在，1 = 回忆；转场时渐变
-  if (tf >= 126.08 && tf < 128.14) return 0.75;   // 结尾：删除存档那一下，照片是老电影
   const r = (a, b) => smooth(seg(tf, a, b));
   if (tf >= 76.72 && tf < 81.1) return r(76.72, 76.9) * (1 - r(80.85, 81.1));
   if (tf >= 82.42 && tf < 99.47) return r(82.42, 82.92) * (1 - r(98.97, 99.47));
   if (tf >= 104.12 && tf < 113.43) return r(104.12, 104.63);
   if (tf >= 113.43 && tf < 116.4) return 1 - r(116.01, 116.4);
   if (tf >= 13.31 && tf < 16.70) return r(13.31, 13.6);   // 开头：往下掉时闪过的回忆照片
-  if (tf >= 45.65 && tf < 47.58) return 1;              // 开头：想念碗筷
+  if (tf >= 30.34 && tf < 34.57) return 1;              // 第 4 句：她拽住要出门跑夜单的他
   if (tf >= 16.70 && tf < 22.79) return 1;              // 第 1 句：送外卖回她消息
   if (tf >= 47.58 && tf < 50.43) return 1;              // 第 7 句：骑车经过海边广告
   if (tf >= 55.73 && tf < 59.91) return 1;              // 第 9 句：在家录歌，她在身后听
@@ -714,6 +655,7 @@ window.sceneReady = (async () => {
 })();
 window.renderAt = async (t) => { frame(t); return out.toDataURL('image/png'); };
 </script>
+<script src="room6.js"></script>
 <script src="player.js"></script>
 <script src="bookends.js"></script>
 </body></html>

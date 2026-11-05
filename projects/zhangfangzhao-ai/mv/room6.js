@@ -1,6 +1,6 @@
 /* 出租屋 v6：一张固定的平面图，所有房间镜头都从这里取景（世界宽 500，画面宽 320）。
    从左到右：[窗 + 书桌（麦克风、电脑、歌词本、台灯）] [书桌椅] [床（床头靠右，枕头）+ 墙上拍立得]
-             [吊灯 + 小餐桌、两张凳] [钟] [挂钩：外卖头盔、伞] [门]
+             [吊灯 + 小餐桌、两张凳] [钟] [门]
    取景：录歌 cam 0；吃饭 cam 120；门口 cam 180。
    依赖全局：PIX、RAMP、clamp、lerp、rnd、LW、LH、CHAR。 */
 window.ROOM6 = (() => {
@@ -9,7 +9,7 @@ window.ROOM6 = (() => {
   const DESK = { x0: 4, x1: 80, top: 148 };
   const CHAIR = { x0: 92, x1: 116 };
   const BED = { x0: 128, x1: 220, top: 176 };
-  const WP = [158, 62];                         // 墙上拍立得左上角（外框 32×24）
+  const WP = [158, 90];                         // 墙上拍立得左上角（外框 32×24）
   const LAMP = [300, 47];
   const TABLE = [262, 338];
   const STOOL_HER = [230, 256], STOOL_HIM = [344, 370];
@@ -53,16 +53,8 @@ window.ROOM6 = (() => {
         G.poly([[X0 - 7, Y1 + 4], [X1 + 7, Y1 + 4], [X1 + 5, Y1 + 8], [X0 - 5, Y1 + 8]], (x, y) => G.dith(RAMP.wood, 1.1 + L(x, y) * 2, x, y), 0);
       } }
     // 墙上：拍立得、钟、挂钩（外卖头盔、伞）
-    drawPhoto(G, cam, L, st);
+    if (!st.noPhoto) drawPhoto(G, cam, L, st); else { const nx = X(WP[0] + 16); G.px(nx, WP[1] - 1, 0); G.px(nx, WP[1], 3); }   // 照片取下来时只剩一颗钉子
     drawClock(G, cam, L, st);
-    { const hx = X(418); if (hx > -16 && hx < LW + 16) {
-      G.rect(hx - 1, 96, 3, 3, 0);                                                                                            // 挂钩
-      if (!st.helmetGone) { G.line(hx, 98, hx, 104, 0);                                                                       // 头盔（黄）挂在钩上
-        G.shape([hx - 11, 103, hx + 11, 122], (x, y) => { const u = (x - hx) / 10, v = (y - 120) / 15; return v <= 0.1 && u * u + v * v <= 1; }, (x, y) => (y > 119 ? 13 : G.dith([25, 23, 24], 0.9 + L(x, y) * 1.3 - (y - 104) / 20, x, y)), 0);
-        G.rect(hx - 9, 115, 6, 4, 2); }
-      // 伞：收起来靠在墙边
-      if (!st.umbrellaGone) { G.line(hx + 12, 128, hx + 16, 203, 0); G.poly([[hx + 9, 140], [hx + 14, 134], [hx + 19, 190], [hx + 15, 196]], (x, y) => G.dith([18, 19], 0.5 + L(x, y) * 1.6, x, y), 0); G.line(hx + 11, 128, hx + 14, 126, 0); }
-    } }
     drawDoor(G, cam, L, st);
     // 地上的影子：桌下、床下
     for (let y = FLOOR + 24; y < FLOOR + 34; y++) for (let x = 0; x < LW; x++) { const wx = x + cam; if ((((wx - 300) / 54) ** 2 + ((y - FLOOR - 30) / 4.5) ** 2 < 1 || ((wx - 174) / 52) ** 2 + ((y - FLOOR - 30) / 4) ** 2 < 1) && PIX.bt(x, y) < 0.6) G.px(x, y, 13); }
@@ -165,7 +157,9 @@ window.ROOM6 = (() => {
     const bowl = (cx, full) => { cx = X(cx); const y = TABLE_Y - 5;
       G.poly([[cx - 6, y], [cx + 6, y], [cx + 5, y + 3], [cx + 2, y + 5], [cx - 2, y + 5], [cx - 5, y + 3]], (x, yy) => (yy === y + 1 ? 4 : G.dith(RAMP.porcelain, 1.2 + L(x, yy) * 2 - (x - cx) / 10, x, yy)), 0);
       if (full) G.ellipse(cx, y - 1, 5, 2.2, (x, yy) => G.dith([6, 29, 8], 0.8 + L(x, yy) * 1.6 - (yy - y + 3) / 4, x, yy), 0); };
-    if (st.bowls !== 0) { if (st.bowls !== 1) { bowl(280, true); G.line(X(272), TABLE_Y - 8, X(290), TABLE_Y - 8, 16); } bowl(320, st.bowls === 1 ? false : false); G.line(X(312), TABLE_Y - 1, X(330), TABLE_Y - 1, 16); }
+    const bw = st.bowls || 'both';   // both：她那碗满的没动；pair：两副空碗筷；one：只有他的
+    if (bw === 'both' || bw === 'pair') { bowl(280, bw === 'both'); G.line(X(272), TABLE_Y - 8, X(290), TABLE_Y - 8, 16); }
+    if (bw !== 'none') { bowl(320, false); G.line(X(312), TABLE_Y - 1, X(330), TABLE_Y - 1, 16); }
     if (st.phoneDown) { G.rect(X(331), TABLE_Y - 2, 6, 2, 0); }
     // 吊灯
     const lx = LAMP[0] - cam + (st.sway || 0); if (lx > -20 && lx < LW + 20) { G.line(LAMP[0] - cam, 0, lx, 36, 0);
