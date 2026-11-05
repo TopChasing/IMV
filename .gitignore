@@ -251,3 +251,5 @@ projects/*/ref/
 # 识别和分离出来的人声、逐词结果只留本地
 projects/*/review/whisper.json
 projects/*/review/*.wav
+# 分离人声和识别结果只留本地
+projects/*/review/whisper_vocals.json
