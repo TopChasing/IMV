@@ -246,3 +246,5 @@ projects/*/storyboard.png
 projects/*/review/
 # 本地工具，不公开
 tools/ncm2music.py
+# 参考视频（别人的作品）只留本地
+projects/*/ref/

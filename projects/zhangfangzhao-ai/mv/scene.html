@@ -11,6 +11,7 @@
 <script src="../lib/pixel.js"></script>
 <script src="../character.js"></script>
 <script src="../lyrics.js"></script>
+<script src="audio-data.js"></script>
 <style>html, body { margin: 0; overflow: hidden; background: #000; } canvas { display: block; image-rendering: pixelated; }</style>
 </head><body><canvas id="out"></canvas>
 <script>
@@ -473,7 +474,7 @@ function drawHUD(G, n, flash) {
   if (n > 0) G.px(9, 9, 8);
 }
 function heartsAt(s) {
-  if (s >= 117.75 && window.BOOK) return BOOK.hearts(s);
+  if ((s >= 117.75 || s < 66.87) && window.BOOK) return BOOK.hearts(s);
   if (inS(s, 'room1')) return s >= 76.72 && s < 80.85 ? 3 : 1;
   if (inS(s, 'push1') || (s >= 82.92 && s < 96.36)) return 3;
   if (s >= 96.36 && s < 98.45) return 2;
@@ -482,23 +483,11 @@ function heartsAt(s) {
   if (s >= 113.43 && s < 116.01) return 3;
   return 1;
 }
-function heartFlash(s) { if (s >= 117.75 && window.BOOK) return BOOK.flash(s); for (const [t, i] of [[96.36, 2], [98.45, 1]]) if (s >= t - 1 / 12 && s < t + 2 / 12) return i; if (s >= 117.6 && s < 117.85) return 0; return -1; }
+function heartFlash(s) { if ((s >= 117.75 || s < 66.87) && window.BOOK) return BOOK.flash(s); for (const [t, i] of [[96.36, 2], [98.45, 1]]) if (s >= t - 1 / 12 && s < t + 2 / 12) return i; if (s >= 117.6 && s < 117.85) return 0; return -1; }
 function lyricAt(s) {
   const Lr = window.LYRICS || [];
   for (let i = 0; i < Lr.length; i++) { const [a, b, txt] = Lr[i], nx = Lr[i + 1]; if (s >= a && s < b + 0.25 && !(nx && s >= nx[0])) return { a, b, txt, i }; }
   return null;
-}
-function drawDialog(G, s) {
-  const cur = lyricAt(s); const X = 6, Y = 207, W = LW - 12, H = 30;
-  for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) { if ((i === 0 || i === W - 1) && (j === 0 || j === H - 1)) continue; const e = Math.min(i, j, W - 1 - i, H - 1 - j); G.px(X + i, Y + j, e === 0 ? 0 : e === 1 ? 7 : e === 2 ? 4 : 1); }
-  if (!cur) return;
-  const chars = [...cur.txt], dur = Math.max(0.6, (cur.b - cur.a) * 0.72), n = clamp(Math.ceil(chars.length * (q(s) - cur.a + 1 / 12) / dur), 0, chars.length);
-  const shown = chars.slice(0, n).join('');
-  // 一行放不下就折成两行（按字宽在空格处断）
-  const maxW = W - 22; let lines = [shown];
-  if (G.textW(GL, cur.txt) > maxW) { let acc = '', cut = -1; for (let i = 0; i < chars.length; i++) { acc += chars[i]; if (G.textW(GL, acc) > maxW) break; if (chars[i] === ' ' || /[，。？）]/.test(chars[i])) cut = i + 1; } if (cut < 0) cut = acc.length - 1; lines = [shown.slice(0, cut), shown.slice(cut).trimStart()]; }
-  lines.forEach((ln, k) => G.text(GL, ln, X + 11, Y + (lines.length > 1 ? 3 + k * 13 : 9), 8, 3));
-  if (n >= chars.length && Math.floor(s * 3) % 2 === 0) { const ax = X + W - 12, ay = Y + H - 7; for (let k = 0; k < 3; k++) for (let i = k; i < 5 - k; i++) G.px(ax + i, ay + k, 23); }
 }
 
 // 现在的时空：暖色往暗、冷的方向挪一级（他的黄 T 恤变成暗琥珀、木头和皮肤暗一级、墙暗一级）
@@ -668,11 +657,11 @@ function frame(t) {
   else if (inS(s, 'zoomOut')) { shotDoor(GA, 113.10); const z = [7, 4, 2][Math.min(2, Math.floor((q(s) - 113.10) * 9))]; zoomCopy(G, GA, 160, 65, z); }
   else if (inS(s, 'door')) shotDoor(G, s);
   else shotLast(G, s);
-  GU.B.fill(255); drawHUD(GU, heartsAt(s), heartFlash(q(s))); drawDialog(GU, s); BOOK.ui(GU, s);
+  GU.B.fill(255); { const hn = heartsAt(s); if (hn >= 0) drawHUD(GU, hn, heartFlash(q(s))); } BOOK.ui(GU, s); PLAYER.draw(GU, s);
   present(s);
 }
 function memAt(tf) {   // 这一帧有多"回忆"：0 = 现在，1 = 回忆；转场时渐变
-  if (tf >= 126.08 && tf < 128.14) return 0.75;   // 结尾：墙上那张照片的近景
+  if (tf >= 126.08 && tf < 128.14) return 0.75;   // 结尾：删除存档那一下，照片是老电影
   const r = (a, b) => smooth(seg(tf, a, b));
   if (tf >= 76.72 && tf < 81.1) return r(76.72, 76.9) * (1 - r(80.85, 81.1));
   if (tf >= 82.42 && tf < 99.47) return r(82.42, 82.92) * (1 - r(98.97, 99.47));
@@ -704,10 +693,11 @@ function present(s) {
 }
 window.sceneReady = (async () => {
   const fam = await PIX.loadFont('../../../assets/fonts/fusion-pixel-12px-zh_hans.woff2');
-  GL = PIX.glyphs(fam, (window.LYRICS || []).map((l) => l[2]).join('') + SAY);
+  GL = PIX.glyphs(fam, (window.LYRICS || []).map((l) => l[2]).join('') + SAY + (window.PLAYER_CHARS || '') + (window.BOOK_CHARS || ''));
   frame(0); return true;
 })();
 window.renderAt = async (t) => { frame(t); return out.toDataURL('image/png'); };
 </script>
+<script src="player.js"></script>
 <script src="bookends.js"></script>
 </body></html>
