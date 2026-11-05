@@ -33,7 +33,7 @@ const HALF = [66.87, 68.43, 70.50, 72.56, 74.63, 76.72, 78.76, 80.85, 82.92];   
 const SHOT = {
   room1: [66.87, 82.42], push1: [82.42, 82.92], street: [82.92, 98.97], push2: [98.97, 99.47],
   room7: [99.47, 104.12], zoomIn: [104.12, 104.63], sea: [104.63, 110.30], sweep: [110.30, 110.81],
-  close: [110.81, 113.10], zoomOut: [113.10, 113.43], door: [113.43, 117.05], last: [117.05, 117.75],
+  close: [110.81, 113.43], door: [113.43, 116.52], last: [116.52, 117.75],
 };
 const inS = (s, k) => s >= SHOT[k][0] && s < SHOT[k][1];
 const SNARE = BAR.flatMap((b) => [b + 1.02, b + 3.06]);                           // 军鼓：慢拍 2、4
@@ -442,36 +442,32 @@ function drawPhotoFrame(G) {   // 定格时的拍立得白框：上左右 10，�
   for (let y = 0; y < LH; y++) for (let x = 0; x < LW; x++) { if (x >= x0 && x < x0 + w && y >= y0 && y < y0 + h) continue; G.px(x, y, G.dith([7, 29, 8], 1.4 - Math.abs(y - 120) / 260, x, y)); }
   G.rect(x0 - 1, y0 - 1, w + 2, 1, 6); G.rect(x0 - 1, y0 + h, w + 2, 1, 6); G.rect(x0 - 1, y0, 1, h, 6); G.rect(x0 + w, y0, 1, h, 6);
 }
-function drawClose(G, s) {   // 中景：夕阳海边，他在左、她在右，她抬手替他擦掉眼角的泪
+function drawClose(G, s) {   // 远景：夕阳海边，两个小小的人，她抬手替他擦掉眼角的泪
   const tf = q(s);
-  drawSeaBG(G, s, 128);
-  for (let y = 192; y < LH; y++) for (let x = 0; x < LW; x++) G.px(x, y, G.dith([15, 16, 17], 1.6 - (y - 192) / 40 + 0.3 * Math.sin(x * 0.05), x, y));
+  drawSeaBG(G, s, 118);
+  for (let y = 176; y < LH; y++) for (let x = 0; x < LW; x++) G.px(x, y, G.dith([15, 16, 17], 1.8 - (y - 176) / 40 + 0.3 * Math.sin(x * 0.05), x, y));
+  { const u = (tf * 0.49) % 1, yl = Math.round(164 + Math.sin(Math.PI * u) * 12); for (let x = 0; x < LW; x++) { const yy = yl + Math.round(Math.sin(x * 0.12 + tf) * 1.5); for (let y = 166; y < yy; y++) G.px(x, y, G.dith([27, 4, 6], 1.2 + (y - 166) / 10, x, y)); G.px(x, yy, 8); if (x % 3 === 0) G.px(x, yy - 1, 7); } }
   const light = (x, y) => 0.5 + 0.35 * clamp(1 - Math.abs(x - 210) / 160);
-  const SZ = 200, FY = 300;
-  const sob = (tf < 111.4 && (hitAt(tf, SNARE, 0.17) || (tf >= 110.81 && tf < 111.4 && Math.floor(tf * 6) % 2))) ? 1 : 0;   // 哭的时候一抽一抽
+  const SZ = 58, FY = 202;
   const reachIn = smooth(seg(tf, 111.05, 111.35)), reachOut = smooth(seg(tf, 112.3, 112.7)), reach = reachIn * (1 - reachOut);
   const wiping = tf >= 111.35 && tf < 112.3, wiped = tf >= 111.8;
-  const him = { who: 'him', x: 122, y: FY + sob, size: SZ, facing: 'right', t: tf, light, expression: 'sad', blink: wiping ? true : undefined, action: 'idle' };
+  const him = { who: 'him', x: 138, y: FY, size: SZ, facing: 'right', t: tf, light, expression: 'sad', blink: wiping ? true : undefined, action: 'idle' };
   CHAR.draw(G, him);
   const H = CHAR.headAt(him), ex = Math.round(H.x + 0.5 * H.r), ey = Math.round(H.y + 0.12 * H.r);
-  if (!wiped && tf >= 110.6) {   // 眼泪：从眼角冒出来，只滑到颧骨（不到半个脸）
-    const d = Math.round(Math.min(1, (tf - 110.6) / 0.6) * H.r * 0.32);
-    for (let k = 2; k < d + 2; k++) G.px(ex + 1, ey + k, 26);
-    G.ellipse(ex + 1, ey + 3 + d, 1.2, 1.7, 26, 0); G.px(ex, ey + 2 + d, 8);
-  }
-  // 她：站到右边，手正好够到他的颧骨
   const her = { who: 'her', y: FY, size: Math.round(SZ * 0.94), facing: 'left', t: tf, light, expression: wiped ? 'neutral' : 'sad', action: 'idle', arms: 'wipe', armsU: 1 };
-  const target = [ex + 2, ey + Math.round(H.r * 0.3)];
-  her.x = 0; const h0 = CHAR.handAt(her); her.x = target[0] - h0.x; her.y = FY + clamp(target[1] - h0.y, -12, 12);
+  const target = [ex + 1, ey + 1];
+  her.x = 0; const h0 = CHAR.handAt(her); her.x = target[0] - h0.x;
   her.armsU = reach * (wiping && Math.floor(tf * 6) % 2 ? 0.9 : 1);
-  if (reach < 0.02) { her.arms = undefined; }
+  if (reach < 0.02) her.arms = undefined;
   CHAR.draw(G, her);
+  if (!wiped && tf >= 110.6) { const d = Math.round(Math.min(1, (tf - 110.6) / 0.6) * 3); G.px(ex + 1, ey + 1 + d, 26); G.px(ex + 1, ey + d, 8); }   // 一滴泪
 }
 // ============================== UI：血条、对话框 ==============================
 const HEART = ['.kk.kk.', 'kxxkxxk', 'kxxxxxk', '.kxxxk.', '..kxk..', '...k...'];
 function drawHUD(G, n, flash) {
-  for (let i = 0; i < 3; i++) HEART.forEach((row, j) => [...row].forEach((ch, k) => { if (ch !== '.') G.px(8 + i * 9 + k, 8 + j, ch === 'k' ? 0 : (i < n ? (flash === i ? 8 : 31) : 2)); }));
-  if (n > 0) G.px(9, 9, 8);
+  const Z = 2;
+  for (let i = 0; i < 3; i++) HEART.forEach((row, j) => [...row].forEach((ch, k) => { if (ch !== '.') G.rect(8 + i * 16 + k * Z, 7 + j * Z, Z, Z, ch === 'k' ? 0 : (i < n ? (flash === i ? 8 : 31) : 2)); }));
+  if (n > 0) G.rect(10, 9, 2, 2, 8);
 }
 function heartsAt(s) {
   if ((s >= 117.75 || s < 66.87) && window.BOOK) return BOOK.hearts(s);
@@ -596,19 +592,14 @@ function shotRoom7(G, s) {   // 第 7 镜：回到出租屋，湿着进门坐下
   drawSigh(G, tf, CHAR.headAt({ who: 'him', ...HIM_SEAT, facing: 'left', action: 'sitHunch', u: 0.6, t: tf }));
 }
 function zoomCopy(dst, src, cx, cy, z) { for (let y = 0; y < LH; y++) for (let x = 0; x < LW; x++) dst.px(x, y, src.get(Math.floor(cx + (x - LW / 2) / z), Math.floor(cy + (y - LH / 2) / z))); }
-function shotDoor(G, s) {   // 平移到门口 → 第 10 镜（回忆：她走出门，他伸手没够到）→ 平移回桌边
-  const tf = q(s);
-  const camIn = Math.round(lerp(53, 160, smooth(seg(tf, 113.43, 113.94))));
-  const camOut = Math.round(lerp(160, 0, smooth(seg(tf, 116.52, 117.05))));
-  const cam = tf < 116.52 ? camIn : camOut;
-  const memory = tf >= 113.94 && tf < 116.01;
-  const cool = smooth(seg(tf, 116.01, 116.4));
-  const door = tf < 113.94 ? 0 : tf < 115.85 ? 1 : 1 - seg(tf, 115.85, 116.01);
-  const st = { s, tf, I: tf < 113.94 ? 0.5 : memory ? 1 : lerp(1, 0.5, cool), rain: 0.6, door: Math.round(door * 4) / 4 };
+function shotDoor(G, s) {   // 第 10 镜（回忆：她走出门，他伸手没够到）。镜头不动；门关上后屋里空一下
+  const tf = q(s), cam = 160;
+  const memory = tf < 116.01, cool = smooth(seg(tf, 116.01, 116.4));
+  const door = tf < 115.85 ? 1 : 1 - seg(tf, 115.85, 116.01);
+  const st = { s, tf, I: memory ? 1 : lerp(1, 0.5, cool), rain: 0.6, door: Math.round(door * 4) / 4 };
   drawRoom(G, cam, st);
   const light = (x, y) => roomLight(st.I)(x + cam, y);
-  // 她：背着包站在门口，115.4 起走出门
-  if (tf >= 113.94 && tf < 116.01) {
+  if (tf < 116.01) {
     const u = smooth(seg(tf, 115.35, 115.9)), x = 372 - cam, y = Math.round(lerp(200, 174, u)), size = Math.round(lerp(78, 62, u));
     const tmp = PIX.create(LW, LH); tmp.B.fill(255);
     const glance = tf >= 114.3 && tf < 114.95;   // 走之前回头看他一眼
@@ -616,11 +607,9 @@ function shotDoor(G, s) {   // 平移到门口 → 第 10 镜（回忆：她走�
     const [d0, dy0, d1] = [DOOR[0] - cam, DOOR[1], DOOR[2] - cam], leafW = Math.round((d1 - d0) * (1 - st.door));
     for (let i = 0; i < LW * LH; i++) { if (tmp.B[i] === 255) continue; const px = i % LW, py = (i / LW) | 0; if (u > 0.6 && (px < d0 || px >= d1 - leafW || py < dy0)) continue; G.B[i] = tmp.B[i]; }
   }
-  // 他：回忆里站着伸手；关门后闪没，现在的他在凳子上闪现
-  if (tf >= 113.94 && blinkOut(s, 116.2)) CHAR.draw(G, { who: 'him', x: 300 - cam, y: 204, size: 90, facing: 'right', action: 'reach', u: smooth(seg(tf, 114.95, 115.5)), t: tf, light, expression: 'sad' });
-  if (tf < 113.94 || blinkIn(s, 116.2)) CHAR.draw(G, { who: 'him', ...HIM_SEAT, x: HIM_SEAT.x - cam, facing: 'left', action: 'sitHunch', u: 0.6, t: tf, light, expression: 'sad' });
+  if (blinkOut(s, 116.2)) CHAR.draw(G, { who: 'him', x: 300 - cam, y: 204, size: 90, facing: 'right', action: 'reach', u: smooth(seg(tf, 114.95, 115.5)), t: tf, light, expression: 'sad' });
   drawTableTop(G, cam, st); drawLamp(G, cam, st);
-  if (tf < 113.94 || cool > 0.5) cold(G);
+  if (cool > 0.5) cold(G);
 }
 function shotLast(G, s) {   // 第 11 镜：一个人，所有东西停住
   const tf = 117.05, st = { s: tf, tf, I: 0.5, rain: 0.6 };
@@ -654,7 +643,6 @@ function frame(t) {
     for (let y = 0; y < LH; y++) for (let x = 0; x < LW; x++) { const d = front - x; G.B[y * LW + x] = d > 24 ? GB.B[y * LW + x] : d > 0 ? G.dith([27, 6, 8], 0.6 + (24 - d) / 10 + Math.sin(y * 0.3) * 0.4, x, y) : GA.B[y * LW + x]; }
   }
   else if (inS(s, 'close')) drawClose(G, s);
-  else if (inS(s, 'zoomOut')) { shotDoor(GA, 113.10); const z = [7, 4, 2][Math.min(2, Math.floor((q(s) - 113.10) * 9))]; zoomCopy(G, GA, 160, 65, z); }
   else if (inS(s, 'door')) shotDoor(G, s);
   else shotLast(G, s);
   GU.B.fill(255); { const hn = heartsAt(s); if (hn >= 0) drawHUD(GU, hn, heartFlash(q(s))); } BOOK.ui(GU, s); PLAYER.draw(GU, s);
@@ -665,8 +653,10 @@ function memAt(tf) {   // 这一帧有多"回忆"：0 = 现在，1 = 回忆；�
   const r = (a, b) => smooth(seg(tf, a, b));
   if (tf >= 76.72 && tf < 81.1) return r(76.72, 76.9) * (1 - r(80.85, 81.1));
   if (tf >= 82.42 && tf < 99.47) return r(82.42, 82.92) * (1 - r(98.97, 99.47));
-  if (tf >= 104.12 && tf < 113.43) return r(104.12, 104.63) * (1 - r(113.10, 113.43));
-  if (tf >= 113.94 && tf < 116.4) return 1 - r(116.01, 116.4);
+  if (tf >= 104.12 && tf < 113.43) return r(104.12, 104.63);
+  if (tf >= 113.43 && tf < 116.4) return 1 - r(116.01, 116.4);
+  if (tf >= 13.31 && tf < 16.70) return r(13.31, 13.6);   // 开头：往下掉时闪过的回忆照片
+  if (tf >= 45.65 && tf < 47.58) return 1;              // 开头：想念碗筷
   return 0;
 }
 function present(s) {

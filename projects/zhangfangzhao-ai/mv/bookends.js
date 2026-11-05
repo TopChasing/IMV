@@ -18,7 +18,7 @@
   const after = (tf, list) => list.filter((b) => tf >= b).length;
 
   // ---------- 字 ----------
-  window.BOOK_CHARS = 'u say唉张方钊继续游戏读取存档新的开始和她第1024天已损坏永远眼泪失败碗筷安全感还差0123456789%爱任务叮嘱按时吃饭别熬夜出门带伞少喝点酒全部完成奖励发送给状态？?我你GAME OVER继续Lv.商店金币不足装备中紫拖鞋未答应词曲pt.1→删除这段是否G';
+  window.BOOK_CHARS = '海边双人游给你一个家一枚戒指一场婚礼一起变老余额不足LV香奈儿劳力士巴黎世家老花手袋链条包手表球鞋￥平/u say唉张方钊继续游戏读取存档新的开始和她第1024天已损坏永远眼泪失败碗筷安全感还差0123456789%爱任务叮嘱按时吃饭别熬夜出门带伞少喝点酒全部完成奖励发送给状态？?我你GAME OVER继续Lv.商店金币不足装备中紫拖鞋未答应词曲pt.1→删除这段是否G';
   function big(G, str, x, y, sc, c, sh) {   // 像素字整数倍放大。sh = [dx, dy, 颜色]：错开的影子
     const draw = (ox, oy, col) => { let cx = ox; for (const ch of str) { const g = GL[ch]; if (!g) { cx += 4 * sc; continue; } for (const [gx, gy] of g.bits) G.rect(cx + gx * sc, oy + gy * sc, sc, sc, col); cx += g.adv * sc; } };
     if (sh) draw(x + sh[0], y + sh[1], sh[2]);
@@ -104,7 +104,7 @@
     G.text(GL, '存档 01', x + 8, y + 5, 8);
     const hearts = bad ? (tf >= 10.24 ? 1 : 2) : 3;
     for (let i = 0; i < 3; i++) HEART.forEach((row, j) => [...row].forEach((ch, k) => { if (ch !== '.') G.px(x + w - 36 + i * 9 + k, y + 8 + j, ch === 'k' ? 0 : i < hearts ? 31 : 2); }));
-    if (!bad) G.text(GL, '和她 第 1024 天', x + 8, y + 18, 26);
+    if (!bad) G.text(GL, '和她 第 999 天', x + 8, y + 18, 26);
     else if (Math.floor(tf * 6) % 2) G.text(GL, '存档已损坏', x + 8, y + 18, 31);
     const p = bad ? 0.99 : smooth(seg(tf, 6.1, 8.6)) * 0.99;
     G.rect(x + 8, y + 34, w - 16, 4, 2); G.rect(x + 8, y + 34, Math.round((w - 16) * p), 4, bad ? 31 : 40);
@@ -133,16 +133,29 @@
     }
   }
   // ============================== O2 往下掉：东西从身边飞上去 ==============================
-  const FALLS = [[13.31, 'bowl', 62], [13.75, 'umb', 256], [14.3, 'photo', 48], [14.84, 'phone', 244], [15.2, 'bowl2', 84], [15.7, 'photo', 232], [16.0, 'phone', 60]];
+  const MEM = [[78.2, 'room'], [79.0, 'room'], [84.95, 'st'], [88.6, 'st'], [92.0, 'st'], [109.0, 'sea'], [111.7, 'close'], [114.6, 'door']];
+  let MEMP = null;
+  function memPhotos() {
+    if (MEMP) return MEMP;
+    const keep = ST; ST = ST0;
+    MEMP = MEM.map(([t, k]) => { T1.fill(0); if (k === 'room') shotRoom1(T1, t); else if (k === 'st') shotStreet(T1, t); else if (k === 'sea') drawSea(T1, t, { photo: true }); else if (k === 'close') drawClose(T1, t); else shotDoor(T1, t);
+      const out = new Uint8Array(128 * 96); for (let j = 0; j < 96; j++) for (let i = 0; i < 128; i++) out[j * 128 + i] = T1.get(Math.floor(i * 2.5), Math.floor(j * 2.5)); return out; });
+    ST = keep; return MEMP;
+  }
+  function drawMemPhoto(G, data, x, y, shear) {   // 4:3 的照片：白边、底边宽一点，微微歪着
+    for (let row = y - 5; row < y + 110; row++) { const off = Math.round((row - y - 48) * shear); G.rect(x - 5 + off, row, 138, 1, row === y - 5 || row === y + 109 ? 0 : 8); G.px(x - 5 + off, row, 0); G.px(x + 132 + off, row, 0);
+      if (row >= y && row < y + 96) for (let i = 0; i < 128; i++) G.px(x + i + off, row, data[(row - y) * 128 + i]); }
+  }
+  const MX = [10, 182, 24, 170, 6, 186, 30, 164], MS = [0.05, -0.04, -0.03, 0.05, 0.04, -0.05, 0.03, -0.03];
   function shotFall(G, tf) {
     for (let y = 0; y < LH; y++) for (let x = 0; x < LW; x++) G.px(x, y, G.dith([44, 1, 2, 3], y / LH * 2.4, x, y));
-    for (let i = 0; i < 70; i++) { const x = Math.floor(rnd('fx' + i) * LW), sp = 200 + rnd('fs' + i) * 340, len = 6 + rnd('fl' + i) * 22, y = 260 - ((rnd('fy' + i) * 300 + tf * sp) % 300); for (let k = 0; k < len; k++) G.px(x, y + k, i % 7 === 0 ? 42 : i % 5 === 0 ? 25 : k < len / 2 ? 3 : 5); }
-    for (const [t0, kind, x] of FALLS) { const y = 270 - (tf - t0) * 300; if (y < -50 || y > 270) continue;
-      if (kind === 'bowl') bowl(G, x, y, 54, false); else if (kind === 'bowl2') bowl(G, x, y, 40, true); else if (kind === 'umb') umbrellaP(G, x, y); else if (kind === 'photo') photoP(G, x, y); else phoneP(G, x, y); }
+    for (let i = 0; i < 50; i++) { const x = Math.floor(rnd('fx' + i) * LW), sp = 240 + rnd('fs' + i) * 340, len = 8 + rnd('fl' + i) * 22, y = 260 - ((rnd('fy' + i) * 300 + tf * sp) % 300); for (let k = 0; k < len; k++) G.px(x, y + k, k < len / 2 ? 3 : 5); }
     const gu = seg(tf, 16.25, 16.7), by = Math.round(lerp(300, 196, gu * gu));
     if (gu > 0) { for (let y = by; y < LH; y++) for (let x = 0; x < LW; x++) G.px(x, y, G.dith([1, 2, 3], 2 - (y - by) / 20, x, y)); for (let i = 0; i < 8; i++) G.rect(20 + i * 40, by + 6, 20, 1, 5); }
-    const fy = Math.round(lerp(lerp(70, 150, seg(tf, 13.0, 14.0)), 194, gu * gu)) + Math.round(Math.sin(tf * 5) * 3);
-    CHAR.draw(G, { who: 'him', x: 160 + Math.round(Math.sin(tf * 2.3) * 10), y: fy, size: 66, facing: 'right', action: 'jump', u: 0.5, t: tf, expression: 'sad', light: () => 0.6 });
+    const fy = Math.round(lerp(lerp(70, 140, seg(tf, 13.0, 14.0)), 194, gu * gu)) + Math.round(Math.sin(tf * 5) * 3);
+    CHAR.draw(G, { who: 'him', x: 160 + Math.round(Math.sin(tf * 2.3) * 8), y: fy, size: Math.round(lerp(34, 54, gu)), facing: 'right', action: 'jump', u: 0.5, t: tf, expression: 'sad', light: () => 0.6 });
+    const ph = memPhotos();
+    ph.forEach((d, k) => { const t0 = 13.0 + k * 0.42, y = Math.round(250 - (tf - t0) * 240); if (y < -120 || y > 250) return; drawMemPhoto(G, d, MX[k], y, MS[k]); });
   }
   // ============================== O3 落地：雨夜空街，u say 的气泡砸过来 ==============================
   const OLAMPS = Array.from({ length: 16 }, (_, i) => 40 + i * 90);
@@ -239,51 +252,57 @@
     for (let y = hz; y < LH; y++) for (let x = 0; x < LW; x++) { const v = (y - hz) / (LH - hz); let c = G.dith([1, 18, 41, 27], 0.6 + v * 2.2 + Math.sin(x * 0.07 + y * 0.5 + tf * 1.5) * 0.35, x, y); if (Math.abs(x - mx - Math.sin(y * 0.6 + tf * 3) * 3) < mr * (0.55 + v * 0.7) && (y + Math.floor(tf * 6)) % 3 === 0 && PIX.bt(x, y) < 0.7) c = 24; G.px(x, y, c); }
   }
   function frontWave(G, tf, y0, amp = 3) { for (let x = 0; x < LW; x++) { const yy = y0 + Math.round(Math.sin(x * 0.06 + tf * 1.8) * amp + Math.sin(x * 0.17 - tf * 2.4) * 1.5); for (let y = yy; y < LH; y++) G.px(x, y, G.dith([18, 41, 27, 40], 2.6 - (y - yy) / 14, x, y)); G.px(x, yy, 8); if ((x >> 1) % 2) G.px(x, yy + 1, 26); } }
-  function bowlScene(G, tf, o = {}) {   // 他坐在一只大碗里，用筷子当桨；旁边漂着她那碗没动的饭
-    seaNight(G, tf);
-    const hits = o.hits || [], dip = hits.some((b) => tf >= b && tf < b + 0.25) ? 3 : 0, bob = Math.round(Math.sin(tf * 1.6) * 3) + dip, cx = 132, cy = 148 + bob, row = Math.sin(tf * Math.PI * 2 / 2.066);
-    const hx = Math.round(246 + Math.max(0, tf - 45.65) * 3), hy = 160 + Math.round(Math.sin(tf * 1.3 + 1) * 3);
-    bowl(G, hx, hy, 56, true); G.line(hx - 30, hy - 5, hx + 22, hy - 2, 16); G.line(hx - 28, hy - 7, hx + 24, hy - 4, 15);
-    const him = { who: 'him', x: cx - 6, y: cy + 16, size: 66, facing: 'right', action: 'sit', t: tf, light: () => 0.65, expression: 'sad' };
-    if (o.shield) Object.assign(him, { action: 'sitHunch', u: 1 });
+  const BD = [64, 8, 192, 106];   // 广告牌：x, y, 宽, 高
+  function adText(G, x, y) { big(G, '海边双人游', x, y, 2, 8, [1, 1, 43]); G.text(GL, '￥1999', x, y + 26, 23, 0); }
+  function drawBoard(G, tf, off) {
+    const [x0, y0, w, h] = BD, cx = x0 + w / 2;
+    for (const px of [x0 + 28, x0 + w - 32]) { G.rect(px, y0 + h, 5, 80, 0); G.rect(px + 1, y0 + h, 3, 80, 2); }
+    G.rect(x0 - 4, y0 - 4, w + 8, h + 8, 0); G.rect(x0 - 3, y0 - 3, w + 6, h + 6, 3);
+    if (off) { for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) G.px(x0 + i, y0 + j, (i + j) % 7 === 0 ? 2 : 44); return; }
+    drawBeach(P1, tf, { her: false });
+    for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) G.px(x0 + i, y0 + j, P1.get(Math.floor(i * 320 / w), 26 + Math.floor(j * 320 / w)));
+    adText(G, x0 + 6, y0 + 6);
+    for (let i = 0; i < 9; i++) if (Math.floor(tf * 3 + i) % 3) G.rect(x0 + 6 + i * 21, y0 - 3, 3, 1, 24);
+  }
+  function shotCity(G, tf, o = {}) {
+    streetNow(G, tf, CAM0 + 120);
+    drawBoard(G, tf, o.off);
+    if (!o.off) for (let y = 180; y < 206; y++) for (let x = 40; x < 280; x++) if (PIX.bt(x, y) < 0.34 * (1 - Math.abs(x - 160) / 120) * (1 - (y - 180) / 30)) G.px(x, y, (y % 2 ? 25 : 42));
+    const w = seg(tf, 47.58, 48.4), him = { who: 'him', x: Math.round(lerp(96, 160, w)), y: 196, size: 40, facing: tf < 48.4 ? 'right' : 'back', action: tf < 48.4 ? 'walk' : (o.hit ? 'slump' : 'idle'), u: 0.6, t: tf, light: () => 0.6, expression: 'sad' };
     CHAR.draw(G, him);
-    const h = CHAR.handAt(him);
-    if (!o.shield) { G.line(h.x, h.y, h.x + 38 + row * 10, cy + 42, 16); G.line(h.x + 1, h.y - 1, h.x + 40 + row * 10, cy + 41, 15); }
-    bowl(G, cx, cy, 140, false);
-    frontWave(G, tf, 186);
+    drawRain(G, tf, 0.8, tf);
     return him;
   }
-  function shotSurface(G, tf) {
-    if (tf < 45.65) {
-      seaNight(G, tf, { mx: 284, my: 58, mr: 24 });
-      const up = smooth(seg(tf, 42.75, 43.1)), o = { who: 'him', x: 160, y: Math.round(lerp(290, 226, up)) + Math.round(Math.sin(tf * 1.8) * 3), size: 76, facing: 'front', t: tf, light: () => 0.7, expression: tf >= 44.19 ? 'cry' : 'sad', blink: tf >= 44.19 && tf < 44.8 };
-      CHAR.draw(G, o);
-      frontWave(G, tf, 168);
-      const sp = (tf - 42.85) / 0.8; if (sp > 0 && sp < 1) for (let i = 0; i < 110; i++) { const a = Math.PI * (0.1 + rnd('wa' + i) * 0.8), v = 70 + rnd('wv' + i) * 170, x = 160 + Math.cos(a) * v * sp, y = 170 - Math.sin(a) * v * sp + 190 * sp * sp; G.px(x, y, i % 3 ? 26 : 8); if (i % 4 === 0) G.px(x, y + 1, 8); }
-      if (tf >= 44.19) { const k = Math.floor((tf - 44.19) * 12), sc = k < 1 ? 9 : 8, x = Math.round((250 - bigW('失败', sc)) / 2) + 2; big(G, '失败', x, k < 1 ? 2 : 10, sc, 31, [5, 5, 44]); }
-      shakeAt(G, tf, [42.85], 4); shakeAt(G, tf, [44.19], 6);
-    } else if (tf < 47.58) { bowlScene(G, tf); if (tf >= 46.85) big(G, '碗筷', 18, 18, 3, 23, [2, 2, 43]); }
-    else {   // 一个人的海：大月亮，两只碗越漂越远
-      const k = seg(tf, 47.58, 50.43), hz = 128;
-      seaNight(G, tf, { hz, mx: 160, my: 74, mr: 54 });
-      const bob = Math.round(Math.sin(tf * 1.6) * 1.5), ax = Math.round(lerp(150, 120, k)), bx = Math.round(lerp(190, 262, k));
-      CHAR.draw(G, { who: 'him', x: ax - 2, y: 166 + bob, size: 20, facing: 'right', action: 'sit', t: tf, light: () => 0.55 });
-      bowl(G, ax, 160 + bob, 38, false);
-      bowl(G, bx, 158 - bob, 18, true);
-      for (let i = 0; i < 10; i++) { const u = ((tf * 0.25 + i * 0.1) % 1); G.px(ax - 16 - u * 40, 172 + i % 3, 26); }
-      frontWave(G, tf, 202, 2);
-    }
+  function shotAdFull(G, tf) {   // 广告牌里的海：满屏，沙滩上只有他一个人。屏幕的颗粒和边框还在
+    drawBeach(G, tf, { her: false });
+    for (let y = 0; y < LH; y += 3) for (let x = 0; x < LW; x++) { const c = G.B[y * LW + x]; if (PIX.bt(x, y) < 0.5) G.B[y * LW + x] = CM[c]; }
+    adText(G, 18, 16);
+    for (let k = 0; k < 6; k++) { G.rect(0, k, LW, 1, 0); G.rect(0, LH - 1 - k, LW, 1, 0); G.rect(k, 0, 1, LH, 0); G.rect(LW - 1 - k, 0, 1, LH, 0); }
   }
-  // 第 8 句：气泡像冰雹一样砸进海里，碗跟着一沉
+  // 第 8 句：气泡像冰雹一样砸在街上，广告牌一下一下闪，最后灭了
   const SAY8 = [50.43, 50.9, 51.3, 52.06, 52.45, 52.85, 53.23, 53.6, 54.0, 54.47, 54.85, 55.2];
-  const SAYX = [40, 202, 96, 258, 18, 170, 228, 66, 278, 124, 34, 196];
+  const SAYX = [40, 232, 96, 268, 18, 200, 248, 66, 288, 124, 34, 216];
   function shotHail(G, tf) {
-    const him = bowlScene(G, tf, { hits: SAY8.map((b) => b + 0.26), shield: true });
-    SAY8.forEach((b, i) => { const d = tf - b; if (d < 0 || d >= 0.75) return; const x = SAYX[i], sc = 1 + (i % 3 === 2 ? 1 : 0), yy = -30 + d / 0.26 * 200;
+    const hit = hitIn(tf, SAY8.map((b) => b + 0.26), 0.2);
+    const him = shotCity(G, tf, { off: tf >= 55.2 || hit, hit });
+    SAY8.forEach((b, i) => { const d = tf - b; if (d < 0 || d >= 0.75) return; const x = SAYX[i], sc = 1 + (i % 3 === 2 ? 1 : 0), yy = -30 + d / 0.26 * 214;
       if (d < 0.26) bubble(G, x - 14, Math.round(yy), 'u say', sc);
-      else { const u = (d - 0.26) / 0.49; for (let k = 0; k < 18; k++) { const a = Math.PI * rnd('hs' + i + k), v = 30 + rnd('hv' + i + k) * 50, px = x + Math.cos(a) * v * u, py = 176 - Math.sin(a) * v * u + 60 * u * u; G.px(px, py, k % 3 ? 26 : 8); } } });
-    if (tf >= 51.59 && tf < 52.5) { const u = seg(tf, 51.59, 52.5), H = CHAR.headAt(him); T1.B.fill(255); big(T1, '唉', H.x + 12, H.y - 44 - Math.round(u * 14), 3, 8, [2, 2, 0]); for (let y = 0; y < LH; y++) for (let x = 0; x < LW; x++) { const c = T1.B[y * LW + x]; if (c !== 255 && PIX.bt(x, y) < 1.3 - u * 1.3) G.B[y * LW + x] = c; } }
+      else { const u = (d - 0.26) / 0.49; for (let k = 0; k < 18; k++) { const a = Math.PI * rnd('hs' + i + k), v = 30 + rnd('hv' + i + k) * 50, px = x + Math.cos(a) * v * u, py = 190 - Math.sin(a) * v * u + 60 * u * u; G.px(px, py, k % 3 ? 26 : 8); } } });
+    if (tf >= 51.59 && tf < 52.5) { const u = seg(tf, 51.59, 52.5), H = CHAR.headAt(him); T1.B.fill(255); big(T1, '唉', H.x + 8, H.y - 34 - Math.round(u * 12), 2, 8, [1, 1, 0]); for (let y = 0; y < LH; y++) for (let x = 0; x < LW; x++) { const c = T1.B[y * LW + x]; if (c !== 255 && PIX.bt(x, y) < 1.3 - u * 1.3) G.B[y * LW + x] = c; } }
     shakeAt(G, tf, SAY8.map((b) => b + 0.26), 1);
+  }
+  function shotSurface(G, tf) {
+    seaNight(G, tf, { mx: 284, my: 58, mr: 24 });
+    const up = smooth(seg(tf, 42.75, 43.1)), o = { who: 'him', x: 160, y: Math.round(lerp(290, 226, up)) + Math.round(Math.sin(tf * 1.8) * 3), size: 76, facing: 'front', t: tf, light: () => 0.7, expression: tf >= 44.19 ? 'cry' : 'sad', blink: tf >= 44.19 && tf < 44.8 };
+    CHAR.draw(G, o);
+    frontWave(G, tf, 168);
+    const sp = (tf - 42.85) / 0.8; if (sp > 0 && sp < 1) for (let i = 0; i < 110; i++) { const a = Math.PI * (0.1 + rnd('wa' + i) * 0.8), v = 70 + rnd('wv' + i) * 170, x = 160 + Math.cos(a) * v * sp, y = 170 - Math.sin(a) * v * sp + 190 * sp * sp; G.px(x, y, i % 3 ? 26 : 8); if (i % 4 === 0) G.px(x, y + 1, 8); }
+    if (tf >= 44.19) { const k = Math.floor((tf - 44.19) * 12), sc = k < 1 ? 9 : 8, x = Math.round((250 - bigW('失败', sc)) / 2) + 2; big(G, '失败', x, k < 1 ? 2 : 10, sc, 31, [5, 5, 44]); }
+    shakeAt(G, tf, [42.85], 4); shakeAt(G, tf, [44.19], 6);
+  }
+  function shotBowls(G, tf) {   // 第 7 句中：房间里吃饭的那段回忆；唱到碗筷时推近桌上的两副碗筷
+    shotRoom1(T1, 77.6 + (tf - 45.65));
+    if (tf < 46.85) G.B.set(T1.B); else zoomCopy(G, T1, 160, 140, 2);
   }
   // ============================== O8 心里：一颗大心里面只有那间屋、那个人 ==============================
   const HB = Array.from({ length: 12 }, (_, i) => 55.8 + i * 1.033);
@@ -307,23 +326,21 @@
   // ============================== O9 u need safe：保险库 ==============================
   const SAFE = [60.43, 61.15, 61.71, 62.5, 63.2];
   function shotSafe(G, tf) {
-    for (let y = 0; y < LH; y++) for (let x = 0; x < LW; x++) G.px(x, y, y > 194 ? G.dith([44, 1], 1 - (y - 194) / 30, x, y) : G.dith([1, 2, 3], (y / 194) * 1.6 + (x % 40 < 1 || y % 26 < 1 ? -0.7 : 0), x, y));
-    const cx = 188, cy = 118, R = 74, n = after(tf, SAFE);
-    G.rect(cx - R - 10, cy - R - 10, R * 2 + 20, 194 - cy + R + 10, 0); G.rect(cx - R - 9, cy - R - 9, R * 2 + 18, 194 - cy + R + 9, 3);
-    G.shape([cx - R, cy - R, cx + R, cy + R], (x, y) => Math.hypot(x - cx, y - cy) <= R, (x, y) => { const d = Math.hypot(x - cx, y - cy); return d > R - 5 ? 6 : d > R - 7 ? 2 : G.dith([3, 4, 5, 6], 2 - (x - cx + y - cy) / 70, x, y); }, 0);
-    for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; G.ellipse(cx + Math.cos(a) * (R - 11), cy + Math.sin(a) * (R - 11), 2.4, 2.4, 7, 0); }
-    const ang = n * 0.7 + (tf - 59.9) * 0.1;
-    G.ellipse(cx, cy, 25, 25, (x, y) => G.dith([2, 3, 4], 1.3 - (x - cx + y - cy) / 40, x, y), 0);
-    for (let i = 0; i < 3; i++) { const a = ang + i * Math.PI / 1.5; G.limb([cx, cy], [cx + Math.cos(a) * 34, cy + Math.sin(a) * 34], 2.4, 2.4, 7, 0); G.ellipse(cx + Math.cos(a) * 35, cy + Math.sin(a) * 35, 4, 4, 23, 0); }
-    G.ellipse(cx, cy, 6, 6, 43, 0);
-    const him = { who: 'him', x: 92, y: 194, size: 56, facing: 'right', action: 'reach', u: 0.7 + (hitIn(tf, SAFE, 0.2) ? 0.3 : 0), t: tf, light: () => 0.55, expression: 'sad' };
-    CHAR.draw(G, him);
-    // 安全感的进度条
-    const pct = 12 + n; panel(G, 44, 8, 232, 34);
-    G.text(GL, '安全感', 52, 12, 8); G.rect(94, 16, 130, 6, 2); G.rect(94, 16, Math.round(130 * pct / 100), 6, hitIn(tf, SAFE, 0.17) ? 8 : 43);
-    G.text(GL, pct + '%', 230, 12, 23);
-    if (Math.floor(tf * 4) % 2) G.text(GL, '还差 ' + (100 - pct) + '%', 94, 25, 31);
-    shakeAt(G, tf, SAFE, 1);
+    for (let y = 0; y < 188; y++) for (let x = 0; x < LW; x++) G.px(x, y, G.dith([44, 1, 2], (y / 188) * 1.8, x, y));
+    for (let y = 188; y < LH; y++) for (let x = 0; x < LW; x++) G.px(x, y, G.dith([1, 2, 3], 1.4 - (y - 188) / 26, x, y));
+    const n = after(tf, SAFE);
+    for (const [bx, top, bw] of [[-6, 62, 98], [100, 46, 112], [220, 74, 106]]) {
+      G.rect(bx - 1, top - 1, bw + 2, 190 - top, 0); G.rect(bx, top, bw, 190 - top, 3); G.rect(bx, top, bw, 2, 4);
+      for (let r = 0; (top + 8 + r * 13) < 176; r++) for (let c = 0; (bx + 6 + c * 12) < bx + bw - 8; c++) { const wx = bx + 6 + c * 12, wy = top + 8 + r * 13, h = PIX.hash(bx + '_' + r + '_' + c) % 17;
+        const lit = h < 3 + n * 2; G.rect(wx, wy, 8, 9, lit ? 25 : 1); if (lit) { G.rect(wx, wy, 8, 4, 23); if (h % 3 === 0) G.rect(wx + 1, wy + 4, 3, 5, 14); if (h === 3 + (n - 1) * 2 || h === 2 + n * 2) G.rect(wx, wy, 8, 9, hitIn(tf, SAFE, 0.17) ? 24 : 23); } } }
+    panel(G, 196, 150, 112, 24, { bd: 23, cr: 31 }); G.text(GL, '￥38000/平', 206, 156, 23);
+    G.rect(208, 174, 3, 14, 0); G.rect(292, 174, 3, 14, 0);
+    CHAR.draw(G, { who: 'him', x: 74, y: 196, size: 36, facing: 'right', t: tf, light: () => 0.55, expression: 'sad' });
+    drawRain(G, tf, 0.7, tf);
+    const pct = 12 + n; panel(G, 64, 6, 214, 34);
+    G.text(GL, '安全感', 70, 10, 8); G.rect(110, 14, 120, 6, 2); G.rect(110, 14, Math.round(120 * pct / 100), 6, hitIn(tf, SAFE, 0.17) ? 8 : 43);
+    G.text(GL, pct + '%', 236, 10, 23);
+    if (Math.floor(tf * 4) % 2) G.text(GL, '还差 ' + (100 - pct) + '%', 110, 23, 31);
   }
   // ============================== O10 爱：字砸下来，人越缩越小 ==============================
   function shotLove(G, tf) {
@@ -375,8 +392,6 @@
   const TICKS = [121.62, 121.92, 122.2, 122.48];
   function shotQuest(G, tf) {
     for (let y = 0; y < LH; y++) for (let x = 0; x < LW; x++) G.px(x, y, G.dith([44, 1, 2], (y / LH) * 1.5, x, y));
-    const done = tf >= 122.72;
-    if (done) { for (let y = 0; y < LH; y++) for (let x = 0; x < LW; x++) { const a = Math.atan2(y - 80, x - 160) + (tf - 122) * 0.7; G.px(x, y, Math.floor((a + 7) / (Math.PI / 9)) % 2 === 0 ? G.dith([25, 23], 0.5, x, y) : 15); } }
     panel(G, 40, 18, 240, 176, { bg: 45, bd: 46, cr: 43 });
     CHAR.drawHead(G, { who: 'her', x: 70, y: 48, r: 18, facing: 'front', expression: 'neutral', t: tf });
     G.text(GL, '任务', 100, 28, 43); big(G, '她的叮嘱', 100, 42, 2, 46);
@@ -384,13 +399,13 @@
       G.rect(62 + dx, y, 14, 14, 46); G.rect(63 + dx, y + 1, 12, 12, 45);
       if (tf >= TICKS[i]) { const c = 37; G.line(65, y + 7, 68, y + 11, c); G.line(68, y + 11, 74, y + 2, c); G.line(65, y + 6, 68, y + 10, c); G.line(68, y + 10, 74, y + 1, c); }
       big(G, q0, 84 + dx, y - 5, 2, tf >= TICKS[i] ? 47 : 46); if (tf >= TICKS[i]) G.rect(83, y + 6, bigW(q0, 2) + 2, 2, 43); });
-    if (done) {
-      const k = Math.floor((tf - 122.72) * 12);
-      for (let i = 0; i < 70; i++) { const x = Math.floor(rnd('cfx' + i) * LW + Math.sin(tf * 3 + i) * 5), y = -10 + (rnd('cfy' + i) * 80) + (tf - 122.72) * (120 + rnd('cfv' + i) * 90); G.rect(x, y, 2, 2, [31, 23, 40, 42, 37][i % 5]); }
-      const sc = k < 1 ? 5 : 4, w = bigW('全部完成', sc); big(G, '全部完成', Math.round((LW - w) / 2), 74, sc, 23, [3, 3, 43]);
-      if (tf >= 123.05) { panel(G, 76, 140, 168, 26, { bd: 43, cr: 31 }); G.text(GL, '奖励发送给 她', 88, 147, 8); if (Math.floor((tf - 123.05) * 6) % 3 !== 1) { G.ellipse(226, 153, 6, 6, 31, 0); G.rect(225, 149, 2, 5, 8); G.rect(225, 155, 2, 2, 8); } }
+    if (tf >= 122.72) {   // 全做到了，灯却暗下去：屏幕一点点黑掉，只剩一个没人理的弹窗
+      const k = smooth(seg(tf, 122.72, 123.3)) * 0.8;
+      for (let y = 0; y < LH; y++) for (let x = 0; x < LW; x++) if (PIX.bt(x, y) < k) G.B[y * LW + x] = 44;
+      panel(G, 70, 88, 180, 60, { bg: 44, bd: 4, cr: 5 });
+      big(G, '全部完成', 112, 92, 2, 6);
+      if (tf >= 123.05) { G.text(GL, '奖励发送给 她', 88, 124, 8); if (Math.floor((tf - 123.05) * 6) % 3 !== 1) { G.ellipse(226, 130, 6, 6, 31, 0); G.rect(225, 126, 2, 5, 8); G.rect(225, 132, 2, 2, 8); } }
     }
-    shakeAt(G, tf, [122.72], 4);
   }
   // E4 第 26 句：状态栏，全是问号
   function shotStatus(G, tf) {
@@ -416,22 +431,20 @@
     if (up(tf) && tf < 130.1) for (let i = 0; i < 24; i++) { const u = (tf - 129.7) / 0.4, a = i / 24 * Math.PI * 2; G.px(160 + Math.cos(a) * u * 50, 150 + Math.sin(a) * u * 50, 23); }
   }
   // E7 第 29 句：商店，全都买不起
-  const SHOP_ITEMS = [[130.21, 'shoe'], [130.6, 'jacket'], [131.0, 'cap'], [131.4, 'bag']];
+  const SHOP_ITEMS = [[130.21, 'lv', 'LV', '老花手袋', '￥15800'], [130.72, 'cn', '香奈儿', '链条包', '￥42000'], [131.23, 'rx', '劳力士', '手表', '￥76000'], [131.74, 'bb', '巴黎世家', '球鞋', '￥8900']];
   function itemIcon(G, kind, cx, cy) {
-    if (kind === 'shoe') { G.poly([[cx - 22, cy - 2], [cx - 8, cy - 14], [cx + 4, cy - 12], [cx + 22, cy + 2], [cx + 24, cy + 10], [cx - 22, cy + 10]], (x, y) => (y > cy + 5 ? 7 : (x + y) % 9 < 2 ? 31 : 8), 0); G.line(cx - 6, cy - 8, cx + 4, cy - 4, 2); G.line(cx - 3, cy - 10, cx + 7, cy - 6, 2); }
-    else if (kind === 'jacket') { G.poly([[cx - 12, cy - 16], [cx + 12, cy - 16], [cx + 24, cy - 6], [cx + 18, cy + 6], [cx + 13, cy + 2], [cx + 13, cy + 16], [cx - 13, cy + 16], [cx - 13, cy + 2], [cx - 18, cy + 6], [cx - 24, cy - 6]], (x, y) => (Math.abs(x - cx) < 1 ? 23 : G.dith([1, 2, 3], 1.3 + (y - cy) / 14, x, y)), 0); }
-    else if (kind === 'cap') { G.ellipse(cx - 2, cy, 18, 14, (x, y) => (y > cy ? 44 : G.dith([43, 31], 1 - (y - cy) / 14, x, y)), 0); G.rect(cx - 21, cy, 44, 6, 0); G.rect(cx - 20, cy + 1, 42, 4, 43); G.poly([[cx + 12, cy], [cx + 32, cy + 4], [cx + 30, cy + 8], [cx + 10, cy + 6]], 31, 0); }
-    else { G.poly([[cx - 18, cy - 8], [cx + 18, cy - 8], [cx + 22, cy + 14], [cx - 22, cy + 14]], (x, y) => ((x + y) % 6 === 0 || (x - y + 60) % 6 === 0 ? 2 : 44), 0); G.line(cx - 12, cy - 8, cx - 6, cy - 20, 23); G.line(cx + 12, cy - 8, cx + 6, cy - 20, 23); G.line(cx - 6, cy - 20, cx + 6, cy - 20, 23); G.rect(cx - 2, cy - 4, 4, 3, 23); }
+    if (kind === 'bb') { G.poly([[cx - 22, cy - 2], [cx - 8, cy - 14], [cx + 4, cy - 12], [cx + 22, cy + 2], [cx + 24, cy + 10], [cx - 22, cy + 10]], (x, y) => (y > cy + 4 ? 2 : (x + y) % 9 < 2 ? 5 : 8), 0); G.line(cx - 6, cy - 8, cx + 4, cy - 4, 2); G.line(cx - 3, cy - 10, cx + 7, cy - 6, 2); G.rect(cx - 22, cy + 10, 46, 3, 7); }
+    else if (kind === 'rx') { G.rect(cx - 8, cy - 26, 16, 52, 0); G.rect(cx - 7, cy - 26, 14, 52, 25); for (let y = cy - 26; y < cy + 26; y += 4) G.rect(cx - 7, y, 14, 1, 15); G.ellipse(cx, cy, 15, 15, 23, 0); G.ellipse(cx, cy, 11, 11, 41, 0); G.line(cx, cy, cx + 6, cy - 3, 8); G.line(cx, cy, cx - 2, cy - 8, 8); }
+    else if (kind === 'cn') { G.poly([[cx - 20, cy - 8], [cx + 20, cy - 8], [cx + 22, cy + 16], [cx - 22, cy + 16]], (x, y) => ((x + y) % 6 === 0 || (x - y + 60) % 6 === 0 ? 2 : 44), 0); G.line(cx - 14, cy - 8, cx - 6, cy - 22, 23); G.line(cx + 14, cy - 8, cx + 6, cy - 22, 23); G.line(cx - 6, cy - 22, cx + 6, cy - 22, 23); G.rect(cx - 3, cy - 3, 6, 4, 23); }
+    else { G.poly([[cx - 22, cy - 6], [cx + 22, cy - 6], [cx + 26, cy + 16], [cx - 26, cy + 16]], (x, y) => ((x + y * 3) % 10 < 2 ? 17 : 14), 0); G.rect(cx - 26, cy + 4, 52, 2, 16); for (const d of [-10, 10]) { G.line(cx + d, cy - 6, cx + d, cy - 18, 15); } G.line(cx - 10, cy - 18, cx + 10, cy - 18, 15); G.rect(cx - 2, cy - 2, 4, 4, 23); }
   }
   function shotShop(G, tf) {
     for (let y = 0; y < LH; y++) for (let x = 0; x < LW; x++) G.px(x, y, G.dith([1, 2], (y % 16 < 1 ? 1 : 0.3), x, y));
-    panel(G, 10, 8, 300, 22); G.text(GL, '商店', 20, 13, 8); G.text(GL, 'G 24', 262, 13, 23);
-    SHOP_ITEMS.forEach(([t0, kind], i) => { const x = 10 + i * 76, y = 36; const sel = tf >= t0 && (i === 3 || tf < SHOP_ITEMS[i + 1][0]); panel(G, x, y, 72, 92, sel ? { bd: 23, cr: 31, bg: 1 } : { bg: 44 }); itemIcon(G, kind, x + 36, y + 36);
-      const pr = ['9999', '8888', '6666', '19999'][i]; G.text(GL, 'G' + pr, x + 12, y + 72, tf >= t0 ? 31 : 6); if (sel) cursor(G, x + 3, y + 74, 23); });
-    { const t0 = SHOP_ITEMS.filter((a) => tf >= a[0]).pop()[0]; if (tf < t0 + 0.28) { panel(G, 104, 62, 112, 24, { bd: 43, cr: 31 }); ctext(G, '金币不足', 160, 68, 31); } }
-    panel(G, 10, 134, 300, 66);
-    G.text(GL, '装备中', 22, 140, 6); G.text(GL, '紫拖鞋', 22, 158, 8);
-    for (const fx of [150, 192]) { const y = 168; G.ellipse(fx, y, 12, 26, (x, yy) => G.dith([12, 5], 0.4 + (x - fx) / 20, x, yy), 0); G.ellipse(fx, y + 2, 8, 20, (x, yy) => G.dith(RAMP.skin, 1.2 - (yy - y) / 40, x, yy), 21); for (let k = -2; k <= 2; k++) G.ellipse(fx + k * 3.2, y - 18 + Math.abs(k), 1.5, 1.8, 22, 21); G.rect(fx - 12, y - 9, 25, 9, 0); G.rect(fx - 11, y - 8, 23, 7, 12); G.rect(fx - 11, y - 8, 23, 1, 5); }
+    panel(G, 62, 6, 248, 20); G.text(GL, '商店', 72, 10, 8); G.text(GL, '余额 ￥324', 238, 10, 23);
+    SHOP_ITEMS.forEach(([t0, kind, brand, name, price], i) => { const x = 10 + (i % 2) * 152, y = 32 + (i >> 1) * 88, sel = tf >= t0 && (i === 3 || tf < SHOP_ITEMS[i + 1][0]);
+      panel(G, x, y, 148, 82, sel ? { bd: 23, cr: 31, bg: 1 } : { bg: 44 }); itemIcon(G, kind, x + 36, y + 42);
+      G.text(GL, brand, x + 72, y + 12, 8); G.text(GL, name, x + 72, y + 28, 6); G.text(GL, price, x + 72, y + 50, tf >= t0 ? 31 : 6);
+      if (sel) { cursor(G, x + 64, y + 52, 23); if (tf < t0 + 0.36) { panel(G, x + 66, y + 62, 76, 16, { bd: 43, cr: 31 }); ctext(G, '余额不足', x + 104, y + 63, 31); } } });
   }
   // E8 第 30–31 句：吃药。她的影子一直在后面追；吃下药，影子变蓝往回逃；追上时，碎成一颗小心，没了
   const RP = route([[1, 1], [8, 1], [8, 4], [8, 5], [12, 5]]), PILLC = [12, 5], T_EAT = 135.15, T_CATCH = 136.66;
@@ -450,24 +463,29 @@
     shakeAt(G, tf, [T_EAT], 3);
   }
   // E9 第 32 句：答应你的事，一张一张盖上"未完成"
-  let MINI = null;
-  function miniPhotos() {
-    if (MINI) return MINI;
-    const keep = ST; ST = ST0;
-    const crop = (src, X0, Y0) => { const out = new Uint8Array(120 * 72); for (let j = 0; j < 72; j++) for (let i = 0; i < 120; i++) out[j * 120 + i] = SEPIA[src.get(X0 + i * 2, Y0 + j * 2)] ?? 13; return out; };
-    MINI = [84.95, 88.6, 93.55].map((t) => { shotStreet(T1, t); return crop(T1, 40, 64); });
-    drawSea(T1, 109.25, { photo: true }); MINI.push(crop(T1, 40, 80));
-    ST = keep; return MINI;
+  let DREAM = null;
+  const DREAMS = ['给你一个家', '一枚戒指', '一场婚礼', '一起变老'];
+  function dreamScene(i) {   // 没发生过的事：都是想象出来的，所以画得淡、像褪了色的旧画
+    const G = T1, tf = 1; G.fill(13);
+    const sky = (ramp) => { for (let y = 0; y < 72; y++) for (let x = 0; x < 120; x++) G.px(x, y, G.dith(ramp, y / 72 * (ramp.length - 1), x, y)); };
+    const ground = (y0, ramp) => { for (let y = y0; y < 72; y++) for (let x = 0; x < 120; x++) G.px(x, y, G.dith(ramp, (y - y0) / 8, x, y)); };
+    const L = () => 0.7, P = (who, x, y, size, facing, extra = {}) => CHAR.draw(G, Object.assign({ who, x, y, size, facing, t: tf, light: L, blink: false, expression: 'happy' }, extra));
+    if (i === 0) { sky([3, 12, 42, 25]); ground(58, [15, 14]); G.poly([[22, 34], [56, 12], [90, 34]], 43, 0); G.rect(28, 34, 56, 26, 0); G.rect(29, 34, 54, 25, 17); G.rect(36, 40, 12, 10, 0); G.rect(37, 41, 10, 8, 24); G.rect(62, 42, 12, 17, 14); P('him', 98, 64, 26, 'front'); P('her', 110, 64, 24, 'front'); }
+    else if (i === 1) { G.fill(14); for (let y = 0; y < 72; y++) for (let x = 0; x < 120; x++) if (Math.hypot(x - 60, y - 34) < 34 && PIX.bt(x, y) < 0.5 * (1 - Math.hypot(x - 60, y - 34) / 34)) G.px(x, y, 25); G.rect(36, 44, 48, 22, 0); G.rect(37, 45, 46, 20, 43); G.rect(37, 45, 46, 3, 31); G.rect(44, 48, 32, 12, 44);
+      G.shape([44, 18, 76, 50], (x, y) => { const d = Math.hypot(x - 60, y - 36); return d <= 12 && d >= 8.5; }, 23, 0); G.poly([[54, 22], [60, 14], [66, 22], [60, 30]], (x, y) => (x < 60 ? 26 : 8), 0); G.rect(70, 12, 1, 5, 8); G.rect(68, 14, 5, 1, 8); }
+    else if (i === 2) { sky([5, 42, 25, 24]); ground(60, [16, 15]); G.limb([26, 62], [26, 22], 2, 2, 8, 0); G.limb([94, 62], [94, 22], 2, 2, 8, 0); for (let k = 0; k <= 16; k++) { const a = Math.PI * k / 16, x = 60 - Math.cos(a) * 34, y = 24 - Math.sin(a) * 18; G.ellipse(x, y, 3, 3, k % 2 ? 42 : 8, 0); } P('him', 50, 66, 34, 'front'); P('her', 70, 66, 32, 'front'); G.poly([[62, 36], [78, 36], [84, 66], [56, 66]], (x, y) => (PIX.bt(x, y) < 0.7 ? 8 : 7), null); for (let k = 0; k < 14; k++) G.rect(Math.floor(rnd('wd' + k) * 120), Math.floor(rnd('we' + k) * 50), 2, 2, k % 2 ? 42 : 8); }
+    else { sky([12, 42, 25, 23]); G.ellipse(84, 44, 12, 12, 24, null); ground(56, [14, 13]); G.limb([12, 60], [14, 24], 3, 3, 14, 0); G.ellipse(16, 18, 16, 12, 15, 0); G.rect(36, 50, 56, 3, 14); G.rect(40, 53, 3, 9, 14); G.rect(84, 53, 3, 9, 14); P('him', 54, 60, 26, 'back'); P('her', 72, 60, 24, 'back'); }
+    const out = new Uint8Array(120 * 72); for (let j = 0; j < 72; j++) for (let k = 0; k < 120; k++) { const c = SEPIA[G.get(k, j)] ?? 13; out[j * 120 + k] = PIX.bt(k, j) < 0.28 ? 29 : c; } return out;
   }
   const STAMPS = [138.07, 139.08, 140.06, 140.83];
   function shotDebt(G, tf) {
-    const ph = miniPhotos();
+    if (!DREAM) DREAM = DREAMS.map((_, i) => dreamScene(i));
     for (let y = 0; y < LH; y++) for (let x = 0; x < LW; x++) G.px(x, y, G.dith([44, 9, 10], 0.6 + (x % 24 < 1 ? 0.4 : 0) + (y / LH), x, y));
-    ctext(G, '答应你的', 160, 8, 8, 0);
-    const pos = [[28, 30], [172, 30], [28, 116], [172, 116]];
-    ph.forEach((data, i) => { const [x, y] = pos[i]; if (tf < 137.4 + i * 0.1) return; G.rect(x - 4, y - 4, 128, 80, 0); G.rect(x - 3, y - 3, 126, 78, 8);
+    ctext(G, '答应你的', 160, 6, 8, 0);
+    const pos = [[26, 26], [174, 26], [26, 116], [174, 116]];
+    DREAM.forEach((data, i) => { const [x, y] = pos[i]; if (tf < 137.4 + i * 0.1) return; G.rect(x - 4, y - 4, 128, 88, 0); G.rect(x - 3, y - 3, 126, 86, 8);
       for (let j = 0; j < 72; j++) for (let k = 0; k < 120; k++) G.px(x + k, y + j, data[j * 120 + k]);
-      G.rect(x + 56, y - 7, 8, 6, 31);
+      ctext(G, DREAMS[i], x + 60, y + 72, 46); G.rect(x + 56, y - 7, 8, 6, 31);
       const st = STAMPS[i]; if (tf >= st) { const d = Math.floor((tf - st) * 12), sc = 2 + (d < 1 ? 1 : 0), str = '未完成', w = bigW(str, sc), sx = x + 60 - Math.round(w / 2), sy = y + 36 - 7 * sc; G.rect(sx - 3, sy - 2, w + 6, 13 * sc + 4, 8);
         G.rect(sx - 3, sy - 2, w + 6, 2, 31); G.rect(sx - 3, sy + 13 * sc, w + 6, 2, 31); G.rect(sx - 3, sy - 2, 2, 13 * sc + 4, 31); G.rect(sx + w + 1, sy - 2, 2, 13 * sc + 4, 31); big(G, str, sx, sy, sc, 31); } });
     shakeAt(G, tf, STAMPS.slice(0, 3), 3); shakeAt(G, tf, [STAMPS[3]], 6);
@@ -524,7 +542,10 @@
     else if (tf < 26.61) shotForever(G, tf);
     else if (tf < 30.34) shotFlood(G, tf);
     else if (tf < 42.85) shotUnder(G, tf);
-    else if (tf < 50.43) shotSurface(G, tf);
+    else if (tf < 45.65) shotSurface(G, tf);
+    else if (tf < 47.58) shotBowls(G, tf);
+    else if (tf < 48.67) shotCity(G, tf);
+    else if (tf < 50.43) shotAdFull(G, tf);
     else if (tf < 55.73) shotHail(G, tf);
     else if (tf < 59.91) shotHeart(G, tf);
     else if (tf < 63.91) shotSafe(G, tf);
@@ -542,7 +563,7 @@
     else if (tf < 153.25) shotDawn(G, tf);
     else shotEnd(G, tf);
   }
-  function hearts(s) { if (s < 66.87) return s < 8.66 ? 3 : s < 10.24 ? 2 : 1; if (s >= 153.25) return -1; return s >= 128.41 && s < 129.7 ? 0 : 1; }
+  function hearts(s) { if (s >= 45.65 && s < 47.58) return 3; if (s < 66.87) return s < 8.66 ? 3 : s < 10.24 ? 2 : 1; if (s >= 153.25) return -1; return s >= 128.41 && s < 129.7 ? 0 : 1; }
   function flash(s) { if (s >= 8.66 && s < 8.83) return 2; if (s >= 10.24 && s < 10.41) return 1; if (s >= 128.25 && s < 128.41) return 0; if (s >= 129.7 && s < 129.95) return 0; return -1; }
   function ui(GU, s) {
     const tf = q(s);
@@ -555,14 +576,14 @@
     if (tf >= 128.14 && tf < 130.21) {   // GAME OVER 用清楚的红字
       const k = Math.floor((tf - 128.41) * 12);
       if (tf >= 128.41) { const sc = k < 1 ? 4 : 3, str = 'GAME OVER', w = bigW(str, sc); big(GU, str, Math.round((LW - w) / 2), 36, sc, up(tf) ? 4 : 31, [2, 2, 44]); }
-      if (tf >= 128.41 && tf < 129.3) { const u = (tf - 128.41) / 0.9; HEART.forEach((row, j) => [...row].forEach((ch, c) => { if (ch === '.') return; const left = c < 3 || (c === 3 && j % 2 === 0), dx = Math.round((left ? -1 : 1) * u * 6), dy = Math.round(u * u * 26); GU.px(8 + c + dx, 8 + j + dy, ch === 'k' ? 0 : 31); })); }
+      if (tf >= 128.41 && tf < 129.3) { const u = (tf - 128.41) / 0.9; HEART.forEach((row, j) => [...row].forEach((ch, c) => { if (ch === '.') return; const left = c < 3 || (c === 3 && j % 2 === 0), dx = Math.round((left ? -1 : 1) * u * 8), dy = Math.round(u * u * 30); GU.rect(8 + c * 2 + dx, 7 + j * 2 + dy, 2, 2, ch === 'k' ? 0 : 31); })); }
       if (tf >= 128.91 && !up(tf)) { ctext(GU, '继续？', 160, 82, 8); big(GU, '24', 136, 96, 2, 23, [1, 1, 43]); }
       if (up(tf)) { const sc = 2, str = 'Lv.24', w = bigW(str, sc); big(GU, str, Math.round((LW - w) / 2), 84, sc, 23, [2, 2, 43]); }
     }
   }
   const gray = (tf) => (tf >= 128.41 && tf < 129.7 ? 1 : 0);
   const fade = (tf) => 0.9 * smooth(seg(tf, 157.4, 158));
-  const warm = (tf) => tf < 8.66 || (tf >= 144.99 && tf < 153.25);
+  const warm = (tf) => tf < 8.66 || (tf >= 48.67 && tf < 50.43) || (tf >= 144.99 && tf < 153.25);
   function clock(tf) {   // 141.34 之后：钟从快 3 点越转越快，到 144.99 切走时是 5:50
     const base = 2 * 3600 + 47 * 60 + 20 + (tf - 66.87), target = 5 * 3600 + 50 * 60 - (2 * 3600 + 47 * 60 + 20 + (144.99 - 66.87));
     return base + target * Math.pow(seg(tf, 141.34, 144.99), 1.6);

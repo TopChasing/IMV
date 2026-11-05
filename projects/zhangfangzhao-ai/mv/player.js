@@ -5,8 +5,8 @@
 (function () {
   'use strict';
   const TH = {
-    cold: { bg: 44, bd: 40, in: 41, cr: 42, on: 8, off: 5, cur: 23, ic: 42, eq: [40, 26, 42], pf: 42, tr: 3, dg: 6, run: 8, key: null },
-    warm: { bg: 45, bd: 46, in: 47, cr: 43, on: 46, off: 47, cur: 43, ic: 43, eq: [15, 25, 43], pf: 43, tr: 47, dg: 46, run: 8, key: 43 },
+    cold: { bg: 44, bd: 40, in: 41, cr: 42, on: 8, off: 5, note: 41, cur: 23, ic: 42, eq: [40, 26, 42], pf: 42, tr: 3, dg: 6, run: 8, key: null },
+    warm: { bg: 45, bd: 46, in: 47, cr: 43, on: 46, off: 47, note: 47, cur: 43, ic: 43, eq: [15, 25, 43], pf: 43, tr: 47, dg: 46, run: 8, key: 43 },
   };
   const KEYS = [['唉', 42], ['永远', 23], ['眼泪', 40], ['失败', 42], ['碗筷', 23], ['海', 40], ['安全感', 23], ['safe', 23], ['爱', 42], ['自卑', 42], ['亏欠', 42], ['但', 42], ['pill', 40], ['药', 40], ['24岁', 23]];
   const IDLE = '张方钊 - 唉（u say）';
@@ -65,10 +65,10 @@
     lines.forEach(([a, b], li) => {
       let cx = X + 16 + Math.round((W - 58 - lineW(chars, a, b)) / 2), y = Y + 3 + li * 13 + slide;
       for (let i = a; i < b; i++) {
-        const ch = chars[i], t = times ? times[i] : -1, sung = !cur || tf >= t, age = tf - t;
-        let c = sung ? (keyAt[i] ?? T.on) : T.off, dy = 0, dx = 0;
-        if (cur && sung && age < 0.17) { dy = -1; if (keyAt[i] === undefined) c = T.cur; }
-        if (ch === '唉' && cur && sung && age < 0.5) dx = Math.floor(tf * 12) % 2 ? 1 : -1;
+        const ch = chars[i], t = times ? times[i] : 0, note = cur && times && t < 0, sung = !cur || note || tf >= t, age = tf - t;   // note：括号里的翻译，没人唱
+        let c = note ? T.note : sung ? (keyAt[i] ?? T.on) : T.off, dy = 0, dx = 0;
+        if (cur && !note && sung && age < 0.17) { dy = -1; if (keyAt[i] === undefined) c = T.cur; }
+        if (ch === '唉' && cur && !note && sung && age < 0.5) dx = Math.floor(tf * 12) % 2 ? 1 : -1;
         if (!cur) c = T.on;
         G.text(GL, ch, cx + dx, y + dy, c);
         cx += GL[ch] ? GL[ch].adv : 4;
